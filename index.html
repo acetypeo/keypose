@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KeyPose - Keyframe Animation Tool</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #0a0a0f;
+            color: #eee;
+            line-height: 1.5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+        /* Header */
+        .header {
+            padding: 1.5rem 0;
+            border-bottom: 1px solid #2a2a3a;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        .logo span {
+            color: #ff8844;
+        }
+        .nav {
+            display: flex;
+            gap: 1.5rem;
+        }
+        .nav a {
+            color: #ccc;
+            text-decoration: none;
+        }
+        .nav a:hover {
+            color: #ff8844;
+        }
+        /* Hero */
+        .hero {
+            text-align: center;
+            padding: 4rem 0;
+        }
+        .hero h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        .hero h1 span {
+            color: #ff8844;
+        }
+        .hero p {
+            font-size: 1.2rem;
+            color: #aaa;
+            max-width: 600px;
+            margin: 0 auto 2rem;
+        }
+        .launch-btn {
+            display: inline-block;
+            background: #ff8844;
+            color: black;
+            font-size: 1.2rem;
+            font-weight: bold;
+            padding: 0.8rem 2rem;
+            border-radius: 3rem;
+            text-decoration: none;
+            margin: 0.5rem;
+        }
+        .launch-btn:hover {
+            background: #ffaa66;
+            transform: scale(1.02);
+        }
+        .secondary-btn {
+            display: inline-block;
+            background: #2a2a3a;
+            color: white;
+            font-size: 1.2rem;
+            padding: 0.8rem 2rem;
+            border-radius: 3rem;
+            text-decoration: none;
+            margin: 0.5rem;
+        }
+        .secondary-btn:hover {
+            background: #ff8844;
+            transform: scale(1.02);
+        }
+        /* Features - Blockbench style horizontal rows */
+        .features {
+            padding: 4rem 0;
+            max-width: 1100px;
+            margin: 0 auto;
+            scroll-margin-top: 80px;
+        }
+        .feature-row {
+            display: flex;
+            align-items: center;
+            gap: 3rem;
+            margin-bottom: 4rem;
+        }
+        .feature-row.reverse {
+            flex-direction: row-reverse;
+        }
+        .feature-text {
+            flex: 1;
+        }
+        .feature-text h3 {
+            font-size: 1.8rem;
+            margin-bottom: 0.75rem;
+            color: #ff8844;
+        }
+        .feature-text p {
+            color: #bbb;
+            line-height: 1.5;
+        }
+        .feature-image {
+            flex: 1;
+        }
+        .feature-image img {
+            width: 100%;
+            border-radius: 0.75rem;
+            border: 1px solid #2a2a3a;
+            background: #1a1a2a;
+            display: block;
+        }
+        /* Screenshot */
+        .screenshot {
+            text-align: center;
+            padding: 2rem 0;
+        }
+        .screenshot img {
+            max-width: 100%;
+            border-radius: 1rem;
+            border: 1px solid #2a2a3a;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        /* Download row */
+        .downloads {
+            background: #1a1a2a;
+            padding: 2rem;
+            border-radius: 1rem;
+            text-align: center;
+            margin: 2rem 0;
+            scroll-margin-top: 80px;
+        }
+        .download-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+        }
+        .download-btn {
+            background: #2a2a3a;
+            padding: 0.5rem 1.2rem;
+            border-radius: 2rem;
+            text-decoration: none;
+            color: white;
+        }
+        .download-btn:hover {
+            background: #ff8844;
+            color: black;
+        }
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 2rem 0;
+            border-top: 1px solid #2a2a3a;
+            margin-top: 2rem;
+            font-size: 0.8rem;
+            color: #666;
+        }
+        hr {
+            border-color: #2a2a3a;
+            margin: 1rem 0;
+        }
+        html {
+            scroll-behavior: smooth;
+        }
+        @media (max-width: 768px) {
+            .feature-row, .feature-row.reverse {
+                flex-direction: column;
+                gap: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo"><span>🦴</span> KeyPose</div>
+            <div class="nav">
+                <a href="#">Home</a>
+                <a href="#features">Features</a>
+                <a href="#downloads">Download</a>
+                <a href="#">Docs</a>
+                <a href="https://github.com/acetypeo/keypose">GitHub</a>
+            </div>
+        </div>
+
+        <!-- Hero -->
+        <div class="hero">
+            <h1><span>KeyPose</span> v0.5</h1>
+            <p>Browser-based keyframe animation for GLTF/GLB characters. Pose bones, animate keyframes, export storyboards.</p>
+            <div>
+                <a href="https://acetypeo.github.io/keypose/keypose.html" class="launch-btn">🎬 Launch Web App</a>
+                <a href="#downloads" class="secondary-btn">⬇️ Download Desktop</a>
+            </div>
+        </div>
+
+        <!-- Screenshot placeholder -->
+        <div class="screenshot">
+            <img src="images/screenshot-placeholder.png" alt="KeyPose screenshot" style="background:#2a2a3a; min-height:200px;">
+            <p style="margin-top:0.5rem; font-size:0.8rem;">KeyPose timeline and bone controls</p>
+        </div>
+
+        <!-- Features -->
+        <div class="features" id="features">
+            <div class="feature-row">
+                <div class="feature-text">
+                    <h3>🦴 Bone Posing</h3>
+                    <p>Click bone markers, use Move/Rotate controls. Full transform control for every bone in your GLTF/GLB model.</p>
+                </div>
+                <div class="feature-image">
+                    <img src="images/bone-posing.gif" alt="Bone posing demo">
+                </div>
+            </div>
+            <div class="feature-row reverse">
+                <div class="feature-text">
+                    <h3>🎞️ Keyframe Timeline</h3>
+                    <p>Set keyframes, drag hold arrows, choose linear/step interpolation. Camera follows "ones", character respects holds.</p>
+                </div>
+                <div class="feature-image">
+                    <img src="images/timeline.gif" alt="Timeline demo">
+                </div>
+            </div>
+            <div class="feature-row">
+                <div class="feature-text">
+                    <h3>📸 Storyboard Panels</h3>
+                    <p>Capture poses as panels, reorder, rename. Export as PDF with manga margins or full frame sequence with production labels (A, A1, B...).</p>
+                </div>
+                <div class="feature-image">
+                    <img src="images/storyboard.gif" alt="Storyboard demo">
+                </div>
+            </div>
+            <div class="feature-row reverse">
+                <div class="feature-text">
+                    <h3>🎨 Shader Effects</h3>
+                    <p>Cel shading, exposure, greyscale, gradient maps. Real-time, preserved in exports.</p>
+                </div>
+                <div class="feature-image">
+                    <img src="images/shader.gif" alt="Shader effects demo">
+                </div>
+            </div>
+        </div>
+
+        <!-- Download Row -->
+        <div class="downloads" id="downloads">
+            <h3>📦 Download KeyPose</h3>
+            <div class="download-buttons">
+                <a href="#" class="download-btn">🐧 Linux (.AppImage)</a>
+                <a href="#" class="download-btn">🪟 Windows (.exe)</a>
+                <a href="#" class="download-btn">📥 Starter Models (GLB)</a>
+            </div>
+            <p style="margin-top:1rem; font-size:0.8rem;">Or <a href="https://acetypeo.github.io/keypose/keypose.html" style="color:#ff8844;">use the web version</a> — no install required.</p>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>KeyPose v0.5 — Open source under GPLv3</p>
+            <p><a href="https://github.com/acetypeo/keypose">GitHub</a> • <a href="https://github.com/acetypeo/keypose/issues">Report Issue</a> • <a href="#">Documentation</a></p>
+        </div>
+    </div>
+</body>
+</html>
