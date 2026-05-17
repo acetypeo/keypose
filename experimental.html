@@ -905,13 +905,14 @@
         <button class="menu-item" id="load-full-project">📂 Load Full Project</button>
         <div style="font-size:9px;color:#ffaa66;margin-top:4px;">✅ Saves models, panels, timeline, shaders, FPS — exactly as is</div>
     </div>
-    <!-- ========== NEW COLLABORATION SECTION ========== -->
+    <!-- ========== COLLABORATION SECTION (fixed) ========== -->
     <div class="menu-section">
         <div class="menu-section-title">🌐 COLLABORATION (P2P)</div>
         <button class="menu-item" id="host-collab-btn">🎥 Host Session</button>
         <button class="menu-item" id="join-collab-btn">🔗 Join Session</button>
+        <button class="menu-item" id="leave-collab-btn" style="display:none;">🚪 Leave Session</button>
         <div id="collab-status" style="font-size:9px; color:#ffaa66; margin-top:4px;">⚪ Not connected</div>
-        <button class="menu-item" id="copy-invite-btn" style="display:none;">📋 Copy Invite Link</button>
+        <div id="user-list" style="font-size:9px; margin-top:4px; color:#aaa;"></div>
     </div>
 </div>
 
@@ -1026,7 +1027,7 @@
     </script>
 
     <script type="module">
-        // ============================================================
+  // ============================================================
 // SECTION START: IMPORTS_AND_CORE_SETUP
 // ============================================================
 import * as THREE from 'three';
@@ -1037,9 +1038,9 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 
-// ========== YJS COLLABORATION IMPORTS (working CDN) ==========
+// ========== YJS COLLABORATION IMPORTS (WebSocket provider) ==========
 import * as Y from 'https://esm.sh/yjs@13.6.15';
-import { WebrtcProvider } from 'https://esm.sh/y-webrtc@10.3.0';
+import { WebsocketProvider } from 'https://esm.sh/y-websocket@1.5.2';
 
 // ========== CORE SETUP ==========
 const scene = new THREE.Scene();
@@ -1076,22 +1077,24 @@ orbit.enableDamping = true;
 orbit.target.set(0, 0.8, 0);
 
 // ========== YJS GLOBALS (initially inactive) ==========
-let ydoc = null;           // Yjs document – created when host/join starts
-let provider = null;       // WebRTC provider
-let isCollaborative = false; // flag to know if we are in a session
-let sharedPanels = null;   // Y.Array
-let sharedTimelines = null; // Y.Map
-let awareness = null;      // Yjs awareness (for user presence)
+let ydoc = null;
+let provider = null;
+let isCollaborative = false;
+let sharedPanels = null;
+let sharedTimelines = null;
+let sharedModels = null;   // for model file sync
+let awareness = null;
 
 // ============================================================
 // SECTION END: IMPORTS_AND_CORE_SETUP
 // ============================================================
 
 // ============================================================
-// SECTION START: COLLAB_SYSTEM
+// SECTION START: COLLAB_SYSTEM (Your own Railway relay)
 // ============================================================
-// This section adds P2P collaboration via Yjs + WebRTC.
-// It uses the globals defined above.
+// Uses your private WebSocket relay on Railway.
+// Awareness is taken from provider.awareness.
+// Panel/timeline sync happens via existing observers in PANEL_SYSTEM/TIMELINE_CORE.
 // ============================================================
 
 function updateCollabStatus(message, isConnected = false) {
@@ -1100,6 +1103,25 @@ function updateCollabStatus(message, isConnected = false) {
         statusDiv.innerHTML = message;
         statusDiv.style.color = isConnected ? '#88ff88' : '#ffaa66';
     }
+    console.log(`[Collab] ${message} (connected=${isConnected})`);
+}
+
+function updateUserList() {
+    const userListDiv = document.getElementById('user-list');
+    if (!userListDiv) return;
+    if (!awareness) {
+        userListDiv.innerHTML = '';
+        return;
+    }
+    const states = awareness.getStates();
+    const users = Array.from(states.values()).map(s => s.user?.name || 'Anonymous');
+    if (users.length === 0) {
+        userListDiv.innerHTML = '';
+    } else if (users.length === 1) {
+        userListDiv.innerHTML = `👤 ${users[0]} (you)`;
+    } else {
+        userListDiv.innerHTML = `👥 ${users.join(', ')}`;
+    }
 }
 
 function generateRoomName() {
@@ -1107,71 +1129,103 @@ function generateRoomName() {
 }
 
 function startCollabSession(roomName, userName, isHost) {
-    if (ydoc) {
-        if (provider) provider.destroy();
-        ydoc.destroy();
+    console.log(`[Collab] Starting session: room="${roomName}", user="${userName}"`);
+
+    if (provider) {
+        provider.destroy();
+        provider = null;
     }
-    
+    if (ydoc) {
+        ydoc.destroy();
+        ydoc = null;
+    }
+
     ydoc = new Y.Doc();
     sharedPanels = ydoc.getArray('panels');
     sharedTimelines = ydoc.getMap('timelines');
-    awareness = ydoc.getAwareness();
-    awareness.setLocalState({ user: { name: userName, color: '#ff8844' } });
-    
-    provider = new WebrtcProvider(roomName, ydoc, {
-        signaling: ['wss://signaling.yjs.dev'], // Public signaling server – replace with your own for production
-        password: null, // No password – open session
-    });
-    
-    provider.on('synced', (synced) => {
-        if (synced) {
+    sharedModels = ydoc.getMap('models');   // <-- ADDED for model sync
+
+    // Use your own Railway WebSocket relay (always on, no third‑party)
+    const relayUrl = 'wss://web-server-relay-production.up.railway.app';
+    provider = new WebsocketProvider(relayUrl, roomName, ydoc);
+
+    // Get awareness from the provider (this is the correct way)
+    awareness = provider.awareness;
+    if (awareness) {
+        awareness.setLocalState({ user: { name: userName, color: '#ff8844' } });
+    } else {
+        console.warn('[Collab] Awareness not available');
+    }
+
+    provider.on('status', (event) => {
+        console.log(`[Collab] WebSocket status: ${event.status}`);
+        if (event.status === 'connected') {
             isCollaborative = true;
             updateCollabStatus(`✅ Connected to room: ${roomName} as ${userName}`, true);
+            
+            // **** CRITICAL FIX: Initialize panel and timeline sync ****
             if (window.syncPanelsFromYjs) window.syncPanelsFromYjs();
             if (window.initCollabPanels) window.initCollabPanels();
             if (window.initCollabTimelines) window.initCollabTimelines();
+            if (window.syncModelsFromYjs) window.syncModelsFromYjs();   // <-- ADDED
+            if (window.initCollabModels) window.initCollabModels();     // <-- ADDED
             
-            const copyBtn = document.getElementById('copy-invite-btn');
-            if (copyBtn) {
-                copyBtn.style.display = 'inline-block';
-                copyBtn.onclick = () => {
-                    const inviteLink = `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(roomName)}`;
-                    navigator.clipboard.writeText(inviteLink);
-                    updateCollabStatus(`📋 Invite link copied!`, true);
-                };
-            }
+            const hostBtn = document.getElementById('host-collab-btn');
+            const joinBtn = document.getElementById('join-collab-btn');
+            const leaveBtn = document.getElementById('leave-collab-btn');
+            if (hostBtn) hostBtn.style.display = 'none';
+            if (joinBtn) joinBtn.style.display = 'none';
+            if (leaveBtn) leaveBtn.style.display = 'inline-block';
+            updateUserList();
         } else {
             updateCollabStatus(`⚠️ Connecting to room: ${roomName}...`, false);
         }
     });
-    
-    provider.on('connection-error', (err) => {
-        console.error('WebRTC connection error', err);
+
+    provider.on('error', (err) => {
+        console.error('[Collab] WebSocket error:', err);
         updateCollabStatus(`❌ Connection error: ${err.message || 'unknown'}`, false);
     });
-    
-    awareness.on('change', () => {
-        const userCount = awareness.getStates().size;
-        updateCollabStatus(`✅ Connected (${userCount} user${userCount !== 1 ? 's' : ''}) in room: ${roomName}`, true);
-    });
-    
-    updateCollabStatus(`🔄 Starting session...`, false);
+
+    if (awareness) {
+        awareness.on('change', () => {
+            updateUserList();
+            const userCount = awareness.getStates().size;
+            updateCollabStatus(`✅ Connected (${userCount} user${userCount !== 1 ? 's' : ''}) in room: ${roomName}`, true);
+        });
+    }
 }
 
 function leaveCollabSession() {
-    if (provider) { provider.destroy(); provider = null; }
-    if (ydoc) { ydoc.destroy(); ydoc = null; }
-    sharedPanels = sharedTimelines = awareness = null;
+    if (provider) {
+        provider.destroy();
+        provider = null;
+    }
+    if (ydoc) {
+        ydoc.destroy();
+        ydoc = null;
+    }
+    sharedPanels = null;
+    sharedTimelines = null;
+    sharedModels = null;   // <-- ADDED
+    awareness = null;
     isCollaborative = false;
     updateCollabStatus(`⚪ Not connected`, false);
-    const copyBtn = document.getElementById('copy-invite-btn');
-    if (copyBtn) copyBtn.style.display = 'none';
+    const hostBtn = document.getElementById('host-collab-btn');
+    const joinBtn = document.getElementById('join-collab-btn');
+    const leaveBtn = document.getElementById('leave-collab-btn');
+    if (hostBtn) hostBtn.style.display = 'inline-block';
+    if (joinBtn) joinBtn.style.display = 'inline-block';
+    if (leaveBtn) leaveBtn.style.display = 'none';
+    const userListDiv = document.getElementById('user-list');
+    if (userListDiv) userListDiv.innerHTML = '';
 }
 
 function setupCollabUI() {
     const hostBtn = document.getElementById('host-collab-btn');
     const joinBtn = document.getElementById('join-collab-btn');
-    
+    const leaveBtn = document.getElementById('leave-collab-btn');
+
     if (hostBtn) {
         hostBtn.onclick = () => {
             let roomName = prompt('Enter a room name (or leave empty for random):');
@@ -1182,7 +1236,7 @@ function setupCollabUI() {
             startCollabSession(roomName, userName, true);
         };
     }
-    
+
     if (joinBtn) {
         joinBtn.onclick = () => {
             let roomName = prompt('Enter the room name to join:');
@@ -1192,7 +1246,15 @@ function setupCollabUI() {
             startCollabSession(roomName, userName, false);
         };
     }
-    
+
+    if (leaveBtn) {
+        leaveBtn.onclick = () => {
+            if (confirm('Leave the current session?')) {
+                leaveCollabSession();
+            }
+        };
+    }
+
     const urlParams = new URLSearchParams(window.location.search);
     const roomParam = urlParams.get('room');
     if (roomParam) {
@@ -1493,140 +1555,299 @@ window.leaveCollabSession = leaveCollabSession;
         // ============================================================
 
         // ============================================================
-        // SECTION START: MODEL_LOADER
-        // ============================================================
-        const fileInput = document.getElementById('fileInput');
-        const modelListDiv = document.getElementById('model-list');
-        const binWarning = document.getElementById('bin-warning');
-        const debugPanel = document.getElementById('debug-panel');
-        let debugLogs = [];
+// SECTION START: MODEL_LOADER
+// ============================================================
+const fileInput = document.getElementById('fileInput');
+const modelListDiv = document.getElementById('model-list');
+const binWarning = document.getElementById('bin-warning');
+const debugPanel = document.getElementById('debug-panel');
+let debugLogs = [];
 
-        function addDebugLog(msg) { debugLogs.push(`[${new Date().toLocaleTimeString()}] ${msg}`); if (debugPanel.style
-                .display === 'block') { debugPanel.innerText = debugLogs.join('\n');
-                debugPanel.scrollTop = debugPanel.scrollHeight; } }
-        document.getElementById('debug-btn').onclick = () => { if (debugPanel.style.display === 'block') { debugPanel.style
-                    .display = 'none'; } else { debugPanel.innerText = debugLogs.join('\n');
-                debugPanel.style.display = 'block';
-                debugPanel.scrollTop = debugPanel.scrollHeight; if (!debugPanel.querySelector('.copy-debug-btn')) { const
-                        copyBtn = document.createElement('button');
-                    copyBtn.innerText = 'Copy Logs';
-                    copyBtn.className = 'copy-debug-btn';
-                    copyBtn.onclick = () => { navigator.clipboard.writeText(debugLogs.join('\n'));
-                        addDebugLog('📋 Logs copied'); };
-                    debugPanel.appendChild(copyBtn); } } };
+function addDebugLog(msg) { debugLogs.push(`[${new Date().toLocaleTimeString()}] ${msg}`); if (debugPanel.style
+        .display === 'block') { debugPanel.innerText = debugLogs.join('\n');
+        debugPanel.scrollTop = debugPanel.scrollHeight; } }
+document.getElementById('debug-btn').onclick = () => { if (debugPanel.style.display === 'block') { debugPanel.style
+                .display = 'none'; } else { debugPanel.innerText = debugLogs.join('\n');
+            debugPanel.style.display = 'block';
+            debugPanel.scrollTop = debugPanel.scrollHeight; if (!debugPanel.querySelector('.copy-debug-btn')) { const
+                    copyBtn = document.createElement('button');
+                copyBtn.innerText = 'Copy Logs';
+                copyBtn.className = 'copy-debug-btn';
+                copyBtn.onclick = () => { navigator.clipboard.writeText(debugLogs.join('\n'));
+                    addDebugLog('📋 Logs copied'); };
+                debugPanel.appendChild(copyBtn); } } };
 
-        fileInput.addEventListener('change', async (e) => {
-            const files = Array.from(e.target.files);
-            const gltfFiles = files.filter(f => f.name.endsWith('.gltf'));
-            const glbFiles = files.filter(f => f.name.endsWith('.glb'));
-            const binFiles = files.filter(f => f.name.endsWith('.bin'));
-            const imageFiles = files.filter(f => /\.(png|jpg|jpeg|webp|bmp)$/i.test(f.name));
-            addDebugLog(`Loading ${files.length} files`);
-
-            for (const file of files) {
-                const b64 = await readFileAsBase64(file);
-                if (!allUploadedFiles.find(f => f.name === file.name)) {
-                    allUploadedFiles.push({ name: file.name, data: b64, type: file.type || 'application/octet-stream' });
-                }
+// ========== MODEL SYNC FUNCTIONS ==========
+// Sync local models from sharedModels (called after connection)
+window.syncModelsFromYjs = function() {
+    if (isCollaborative && sharedModels) {
+        sharedModels.forEach((modelData, modelId) => {
+            const existing = loadedModels.find(m => m.userData.id === modelId);
+            if (!existing && modelData.fileData) {
+                loadModelFromData(modelData.name, modelData.fileData, modelId);
             }
-
-            async function processLoadedGltf(gltf, sourceFile) { const model = gltf.scene;
-                model.userData = { id: Date.now() + '-' + Math.random(), name: sourceFile.name, inScene: false, bones: [],
-                    markers: [], fileData: await readFileAsBase64(sourceFile) };
-                let bones = [];
-                model.traverse(c => { if (c.isBone) bones.push(c); });
-                model.traverse(c => { if (c.isSkinnedMesh && c.skeleton) c.skeleton.bones.forEach(b => { if (!bones
-                        .includes(b)) bones.push(b); }); });
-                bones = [...new Map(bones.map(b => [b.id, b])).values()];
-                model.userData.bones = bones;
-                const markers = createBoneMarkers(model, bones);
-                model.userData.markers = markers; if (gltf.animations && gltf.animations.length) { const mixer = new THREE
-                        .AnimationMixer(model);
-                    mixer.clipAction(gltf.animations[0]).play();
-                    mixer.timeScale = 0;
-                    mixerMap.set(model, mixer); }
-                loadedModels.push(model);
-                updateModelListUI();
-                addDebugLog(`Loaded ${sourceFile.name} (${bones.length} bones)`); } for (const glbFile of glbFiles) { const
-                url = URL.createObjectURL(glbFile); try { const loader = new GLTFLoader();
-                const gltf = await new Promise((res, rej) => loader.load(url, res, undefined, rej));
-                URL.revokeObjectURL(url); await processLoadedGltf(gltf, glbFile); } catch (err) { addDebugLog(
-                    `GLB error ${err.message}`); } } for (const gltfFile of gltfFiles) { const resourceBlobUrls = new Map(); for (
-                const binFile of binFiles) { const blob = new Blob([await binFile.arrayBuffer()], { type: 'application/octet-stream' });
-            resourceBlobUrls.set(binFile.name, URL.createObjectURL(blob)); } for (const imgFile of imageFiles) { const blob =
-                new Blob([await imgFile.arrayBuffer()], { type: imgFile.type });
-            resourceBlobUrls.set(imgFile.name, URL.createObjectURL(blob)); } let gltfText = await gltfFile.text();
-            let modifiedGltf = gltfText;
-            const uriRegex = /"uri"\s*:\s*"([^"]+)"/gi;
-            let match; while ((match = uriRegex.exec(gltfText)) !== null) { const originalUri = match[1];
-                const ext = originalUri.split('.').pop().toLowerCase(); if (ext === 'bin' || ['png', 'jpg', 'jpeg', 'webp',
-                    'bmp'
-                ].includes(ext)) { let filename = originalUri.split('/').pop().split('\\').pop();
-                    let blobUrl = null; for (let [storedName, url] of resourceBlobUrls.entries()) { if (storedName ===
-                            filename || storedName.toLowerCase() === filename.toLowerCase()) { blobUrl = url; break; } } if (
-                        blobUrl) modifiedGltf = modifiedGltf.replace(`"${originalUri}"`, `"${blobUrl}"`); else addDebugLog(
-                        `Missing resource ${filename}`); } }
-            const modifiedBlob = new Blob([modifiedGltf], { type: 'application/json' });
-            const modifiedUrl = URL.createObjectURL(modifiedBlob); try { const loader = new GLTFLoader();
-                const gltf = await new Promise((res, rej) => loader.load(modifiedUrl, res, undefined, rej));
-                URL.revokeObjectURL(modifiedUrl); await processLoadedGltf(gltf, gltfFile); } catch (err) { addDebugLog(
-                    `GLTF error ${err.message}`); } for (let url of resourceBlobUrls.values()) URL.revokeObjectURL(
-            url); }
-            fileInput.value = '';
         });
+    }
+};
 
-        function updateModelListUI() { modelListDiv.innerHTML = '';
-            loadedModels.forEach(model => { const div = document.createElement('div');
-                div.className = 'model-item';
-                div.innerHTML =
-                    `<span class="model-name">${model.userData.name.substring(0,20)}</span><span class="model-bones">${model.userData.bones.length}🦴</span><button class="model-btn add">➕ Add</button><button class="model-btn remove">✕ Remove</button>`;
-                div.querySelector('.add').onclick = () => addModelToScene(model);
-                div.querySelector('.remove').onclick = () => removeModelFromScene(model);
-                modelListDiv.appendChild(div); }); }
+// Observe new models added by other users
+function observeSharedModels() {
+    if (isCollaborative && sharedModels) {
+        sharedModels.unobserveAll?.();
+        sharedModels.observe(event => {
+            event.changes.keys.forEach((change, key) => {
+                if (change.action === 'add') {
+                    const modelData = sharedModels.get(key);
+                    if (modelData && !loadedModels.find(m => m.userData.id === key)) {
+                        loadModelFromData(modelData.name, modelData.fileData, key);
+                    }
+                }
+            });
+        });
+    }
+}
+window.initCollabModels = observeSharedModels;
 
-        const raycaster = new THREE.Raycaster();
-        const clickPos = new THREE.Vector2();
-        window.addEventListener('click', (e) => { if (e.target.closest('#gear-btn') || e.target.closest('#gear-menu') || e
-                .target.closest('#param-panel') || e.target.closest('#mode-buttons') || e.target.closest(
-                    '#panels-menu') || e.target.closest('#gallery-modal') || e.target.closest('#timeline-bar') || e
-                .target.closest('#timeline-context-menu')) return;
-            clickPos.x = (e.clientX / renderer.domElement.clientWidth) * 2 - 1;
-            clickPos.y = -(e.clientY / renderer.domElement.clientHeight) * 2 + 1;
-            raycaster.setFromCamera(clickPos, camera);
-            const allMarkers = [];
-            loadedModels.forEach(m => { if (m.userData.markers) allMarkers.push(...m.userData.markers); });
-            const hits = raycaster.intersectObjects(allMarkers); if (hits.length) { const marker = hits[0].object;
-                const bone = marker.userData.bone;
-                const model = marker.userData.model; if (bone && model && model.userData.inScene) { setActiveModel(
-                    model);
-                    gizmo.detach();
-                    gizmo.attach(bone);
-                    document.getElementById('status').innerHTML = `🦴 ${bone.name || 'bone'}`; } } });
+// Helper to load a model from base64 data (used for syncing)
+async function loadModelFromData(name, fileData, modelId) {
+    console.log(`[Model] Loading synced model: ${name}`);
+    const blob = await (await fetch(fileData)).blob();
+    const file = new File([blob], name, { type: 'application/octet-stream' });
+    // Assume GLB for synced models (GLTF with resources is complex – recommend GLB)
+    const url = URL.createObjectURL(file);
+    try {
+        const loader = new GLTFLoader();
+        const gltf = await new Promise((res, rej) => loader.load(url, res, undefined, rej));
+        URL.revokeObjectURL(url);
+        const model = gltf.scene;
+        model.userData = {
+            id: modelId,
+            name: name,
+            inScene: false,
+            bones: [],
+            markers: [],
+            fileData: fileData
+        };
+        let bones = [];
+        model.traverse(c => { if (c.isBone) bones.push(c); });
+        model.traverse(c => { if (c.isSkinnedMesh && c.skeleton) c.skeleton.bones.forEach(b => { if (!bones.includes(b)) bones.push(b); }); });
+        bones = [...new Map(bones.map(b => [b.id, b])).values()];
+        model.userData.bones = bones;
+        const markers = createBoneMarkers(model, bones);
+        model.userData.markers = markers;
+        if (gltf.animations && gltf.animations.length) {
+            const mixer = new THREE.AnimationMixer(model);
+            mixer.clipAction(gltf.animations[0]).play();
+            mixer.timeScale = 0;
+            mixerMap.set(model, mixer);
+        }
+        loadedModels.push(model);
+        updateModelListUI();
+        addDebugLog(`Loaded synced model ${name}`);
+    } catch (err) {
+        addDebugLog(`Error loading synced model ${name}: ${err.message}`);
+        URL.revokeObjectURL(url);
+    }
+}
 
-        document.getElementById('add-cel').onclick = () => { if (activeModel) addShaderToModel(activeModel, 'cel'); else document
-                .getElementById('status').innerHTML = '⚠️ Select a model in scene first'; };
-        document.getElementById('add-exposure').onclick = () => { if (activeModel) addShaderToModel(activeModel,
-            'exposure'); else document.getElementById('status').innerHTML = '⚠️ Select a model in scene first'; };
-        document.getElementById('add-greyscale').onclick = () => { if (activeModel) addShaderToModel(activeModel,
-            'greyscale'); else document.getElementById('status').innerHTML = '⚠️ Select a model in scene first'; };
-        document.getElementById('add-gradient').onclick = () => { if (activeModel) addShaderToModel(activeModel,
-            'gradient'); else document.getElementById('status').innerHTML = '⚠️ Select a model in scene first'; };
-        const btnTrans = document.getElementById('btn-translate');
-        const btnRot = document.getElementById('btn-rotate');
-        const btnBones = document.getElementById('btn-bones');
-        btnTrans.onclick = () => { gizmo.setMode('translate');
-            btnTrans.classList.add('active');
-            btnRot.classList.remove('active'); };
-        btnRot.onclick = () => { gizmo.setMode('rotate');
-            btnRot.classList.add('active');
-            btnTrans.classList.remove('active'); };
-        btnBones.onclick = () => { bonesVisible = !bonesVisible;
-            loadedModels.forEach(m => { if (m.userData.markers) m.userData.markers.forEach(marker => marker.visible =
-                    bonesVisible && m.userData.inScene); });
-            btnBones.innerText = bonesVisible ? '👁️ Hide Bones' : '👁️ Show Bones'; };
-        // ============================================================
-        // SECTION END: MODEL_LOADER
-        // ============================================================
+// Broadcast a newly uploaded model to all peers
+async function broadcastModel(file, modelId, modelName, fileData) {
+    if (!isCollaborative || !sharedModels) return;
+    ydoc.transact(() => {
+        sharedModels.set(modelId, {
+            name: modelName,
+            fileData: fileData,
+            id: modelId
+        });
+    });
+}
+
+// Modified model processing that broadcasts when collaborative
+async function processLoadedGltf(gltf, sourceFile) {
+    const model = gltf.scene;
+    const modelId = Date.now() + '-' + Math.random();
+    const fileData = await readFileAsBase64(sourceFile);
+    model.userData = { 
+        id: modelId, 
+        name: sourceFile.name, 
+        inScene: false, 
+        bones: [], 
+        markers: [], 
+        fileData: fileData 
+    };
+    let bones = [];
+    model.traverse(c => { if (c.isBone) bones.push(c); });
+    model.traverse(c => { if (c.isSkinnedMesh && c.skeleton) c.skeleton.bones.forEach(b => { if (!bones.includes(b)) bones.push(b); }); });
+    bones = [...new Map(bones.map(b => [b.id, b])).values()];
+    model.userData.bones = bones;
+    const markers = createBoneMarkers(model, bones);
+    model.userData.markers = markers;
+    if (gltf.animations && gltf.animations.length) {
+        const mixer = new THREE.AnimationMixer(model);
+        mixer.clipAction(gltf.animations[0]).play();
+        mixer.timeScale = 0;
+        mixerMap.set(model, mixer);
+    }
+    loadedModels.push(model);
+    updateModelListUI();
+    addDebugLog(`Loaded ${sourceFile.name} (${bones.length} bones)`);
+    
+    // Broadcast to other users
+    await broadcastModel(sourceFile, modelId, sourceFile.name, fileData);
+}
+
+// Original file input handler (using the new processLoadedGltf)
+fileInput.addEventListener('change', async (e) => {
+    const files = Array.from(e.target.files);
+    const gltfFiles = files.filter(f => f.name.endsWith('.gltf'));
+    const glbFiles = files.filter(f => f.name.endsWith('.glb'));
+    const binFiles = files.filter(f => f.name.endsWith('.bin'));
+    const imageFiles = files.filter(f => /\.(png|jpg|jpeg|webp|bmp)$/i.test(f.name));
+    addDebugLog(`Loading ${files.length} files`);
+
+    for (const file of files) {
+        const b64 = await readFileAsBase64(file);
+        if (!allUploadedFiles.find(f => f.name === file.name)) {
+            allUploadedFiles.push({ name: file.name, data: b64, type: file.type || 'application/octet-stream' });
+        }
+    }
+
+    // Process GLB files
+    for (const glbFile of glbFiles) {
+        const url = URL.createObjectURL(glbFile);
+        try {
+            const loader = new GLTFLoader();
+            const gltf = await new Promise((res, rej) => loader.load(url, res, undefined, rej));
+            URL.revokeObjectURL(url);
+            await processLoadedGltf(gltf, glbFile);
+        } catch (err) {
+            addDebugLog(`GLB error ${err.message}`);
+        }
+    }
+
+    // Process GLTF files (original logic, now using processLoadedGltf which broadcasts)
+    for (const gltfFile of gltfFiles) {
+        const resourceBlobUrls = new Map();
+        for (const binFile of binFiles) {
+            const blob = new Blob([await binFile.arrayBuffer()], { type: 'application/octet-stream' });
+            resourceBlobUrls.set(binFile.name, URL.createObjectURL(blob));
+        }
+        for (const imgFile of imageFiles) {
+            const blob = new Blob([await imgFile.arrayBuffer()], { type: imgFile.type });
+            resourceBlobUrls.set(imgFile.name, URL.createObjectURL(blob));
+        }
+        let gltfText = await gltfFile.text();
+        let modifiedGltf = gltfText;
+        const uriRegex = /"uri"\s*:\s*"([^"]+)"/gi;
+        let match;
+        while ((match = uriRegex.exec(gltfText)) !== null) {
+            const originalUri = match[1];
+            const ext = originalUri.split('.').pop().toLowerCase();
+            if (ext === 'bin' || ['png', 'jpg', 'jpeg', 'webp', 'bmp'].includes(ext)) {
+                let filename = originalUri.split('/').pop().split('\\').pop();
+                let blobUrl = null;
+                for (let [storedName, url] of resourceBlobUrls.entries()) {
+                    if (storedName === filename || storedName.toLowerCase() === filename.toLowerCase()) {
+                        blobUrl = url;
+                        break;
+                    }
+                }
+                if (blobUrl) modifiedGltf = modifiedGltf.replace(`"${originalUri}"`, `"${blobUrl}"`);
+                else addDebugLog(`Missing resource ${filename}`);
+            }
+        }
+        const modifiedBlob = new Blob([modifiedGltf], { type: 'application/json' });
+        const modifiedUrl = URL.createObjectURL(modifiedBlob);
+        try {
+            const loader = new GLTFLoader();
+            const gltf = await new Promise((res, rej) => loader.load(modifiedUrl, res, undefined, rej));
+            URL.revokeObjectURL(modifiedUrl);
+            await processLoadedGltf(gltf, gltfFile);
+        } catch (err) {
+            addDebugLog(`GLTF error ${err.message}`);
+        }
+        for (let url of resourceBlobUrls.values()) URL.revokeObjectURL(url);
+    }
+    fileInput.value = '';
+});
+
+function updateModelListUI() { 
+    modelListDiv.innerHTML = '';
+    loadedModels.forEach(model => { 
+        const div = document.createElement('div');
+        div.className = 'model-item';
+        div.innerHTML =
+            `<span class="model-name">${model.userData.name.substring(0,20)}</span><span class="model-bones">${model.userData.bones.length}🦴</span><button class="model-btn add">➕ Add</button><button class="model-btn remove">✕ Remove</button>`;
+        div.querySelector('.add').onclick = () => addModelToScene(model);
+        div.querySelector('.remove').onclick = () => removeModelFromScene(model);
+        modelListDiv.appendChild(div);
+    });
+}
+
+const raycaster = new THREE.Raycaster();
+const clickPos = new THREE.Vector2();
+window.addEventListener('click', (e) => { 
+    if (e.target.closest('#gear-btn') || e.target.closest('#gear-menu') || e.target.closest('#param-panel') || 
+        e.target.closest('#mode-buttons') || e.target.closest('#panels-menu') || e.target.closest('#gallery-modal') || 
+        e.target.closest('#timeline-bar') || e.target.closest('#timeline-context-menu')) return;
+    clickPos.x = (e.clientX / renderer.domElement.clientWidth) * 2 - 1;
+    clickPos.y = -(e.clientY / renderer.domElement.clientHeight) * 2 + 1;
+    raycaster.setFromCamera(clickPos, camera);
+    const allMarkers = [];
+    loadedModels.forEach(m => { if (m.userData.markers) allMarkers.push(...m.userData.markers); });
+    const hits = raycaster.intersectObjects(allMarkers); 
+    if (hits.length) { 
+        const marker = hits[0].object;
+        const bone = marker.userData.bone;
+        const model = marker.userData.model; 
+        if (bone && model && model.userData.inScene) { 
+            setActiveModel(model);
+            gizmo.detach();
+            gizmo.attach(bone);
+            document.getElementById('status').innerHTML = `🦴 ${bone.name || 'bone'}`; 
+        } 
+    } 
+});
+
+document.getElementById('add-cel').onclick = () => { 
+    if (activeModel) addShaderToModel(activeModel, 'cel'); 
+    else document.getElementById('status').innerHTML = '⚠️ Select a model in scene first'; 
+};
+document.getElementById('add-exposure').onclick = () => { 
+    if (activeModel) addShaderToModel(activeModel, 'exposure'); 
+    else document.getElementById('status').innerHTML = '⚠️ Select a model in scene first'; 
+};
+document.getElementById('add-greyscale').onclick = () => { 
+    if (activeModel) addShaderToModel(activeModel, 'greyscale'); 
+    else document.getElementById('status').innerHTML = '⚠️ Select a model in scene first'; 
+};
+document.getElementById('add-gradient').onclick = () => { 
+    if (activeModel) addShaderToModel(activeModel, 'gradient'); 
+    else document.getElementById('status').innerHTML = '⚠️ Select a model in scene first'; 
+};
+const btnTrans = document.getElementById('btn-translate');
+const btnRot = document.getElementById('btn-rotate');
+const btnBones = document.getElementById('btn-bones');
+btnTrans.onclick = () => { 
+    gizmo.setMode('translate');
+    btnTrans.classList.add('active');
+    btnRot.classList.remove('active'); 
+};
+btnRot.onclick = () => { 
+    gizmo.setMode('rotate');
+    btnRot.classList.add('active');
+    btnTrans.classList.remove('active'); 
+};
+btnBones.onclick = () => { 
+    bonesVisible = !bonesVisible;
+    loadedModels.forEach(m => { 
+        if (m.userData.markers) m.userData.markers.forEach(marker => marker.visible = bonesVisible && m.userData.inScene); 
+    });
+    btnBones.innerText = bonesVisible ? '👁️ Hide Bones' : '👁️ Show Bones'; 
+};
+// ============================================================
+// SECTION END: MODEL_LOADER
+// ============================================================
 
         // ============================================================
 // SECTION START: PANEL_SYSTEM
@@ -2382,138 +2603,85 @@ window.syncTimelineFromShared = syncTimelineFromShared;
 // SECTION END: TIMELINE_CORE
 // ============================================================
 
-        // ============================================================
+               // ============================================================
         // SECTION START: PANEL_MANAGEMENT_AND_GALLERY
         // ============================================================
-        function createPanel(name) { const sceneState = getCurrentSceneState(); if (!sceneState.models.length) { alert(
-                    'No models in scene'); return; }
-            const screenshot = fastCapture();
-            const autoName = name ? name : `Panel ${panels.length+1}`;
-            const panel = { id: Date.now(), name: autoName, timestamp: new Date().toLocaleString(), screenshot: screenshot,
-                sceneState: sceneState, timeline: { duration: 2.0, keyframes: [{ frame: 0, keyframe: sceneState }] } };
-            panels.push(panel);
-            currentPanelId = panel.id;
-            renderPanelGrid();
-            document.getElementById('status').innerHTML = `📸 Panel "${panel.name}" created`;
-            activePanelForTimeline = panel;
-            updateTimelineUIFromPanel(panel);
-            scrubToTime(0);
-            document.getElementById('timeline-bar').style.display = 'flex';
-            timelineVisible = true;
-            updateTimelineButtonPosition();
-            selectedKeyframeIndex = -1;
-            document.getElementById('selected-keyframe-status').style.display = 'none'; }
-
-        function loadPanel(panelId) { const panel = panels.find(p => p.id === panelId); if (panel) {
-            restoreSceneState(panel.sceneState);
-                currentPanelId = panel.id;
-                renderPanelGrid();
-                document.getElementById('status').innerHTML = `🖼️ Loaded: ${panel.name}`;
-                activePanelForTimeline = panel;
-                updateTimelineUIFromPanel(panel);
-                scrubToTime(0);
-                document.getElementById('timeline-bar').style.display = 'flex';
-                timelineVisible = true;
-                updateTimelineButtonPosition();
-                selectedKeyframeIndex = -1;
-                document.getElementById('selected-keyframe-status').style.display = 'none'; } }
-
-        function capturePanel(panelId) { if (panelId !== currentPanelId) { document.getElementById('status').innerHTML =
-                `⚠️ Load panel first`; return; }
-            const panel = panels.find(p => p.id === panelId); if (panel) { panel.screenshot = fastCapture();
-                panel.sceneState = getCurrentSceneState();
-                panel.timestamp = new Date().toLocaleString(); if (panel.timeline && panel.timeline.keyframes.length &&
-                    panel.timeline.keyframes[0].frame === 0) panel.timeline.keyframes[0].keyframe = panel.sceneState;
-                renderPanelGrid();
-                document.getElementById('status').innerHTML = `📸 Captured ${panel.name}`; } }
-
-        function duplicatePanel(panelId) { const panel = panels.find(p => p.id === panelId); if (panel) { const newPanel = {
-                    id: Date.now(), name: `${panel.name} (copy)`, timestamp: new Date().toLocaleString(),
-                    screenshot: panel.screenshot, sceneState: JSON.parse(JSON.stringify(panel.sceneState)),
-                    timeline: JSON.parse(JSON.stringify(panel.timeline)) };
-                panels.push(newPanel);
-                renderPanelGrid();
-                document.getElementById('status').innerHTML = `📋 Duplicated ${newPanel.name}`; } }
-
-        function deletePanel(panelId) { panels = panels.filter(p => p.id !== panelId); if (currentPanelId === panelId)
-                currentPanelId = null;
-            renderPanelGrid();
-            document.getElementById('status').innerHTML = `🗑️ Panel deleted`; if (!getCurrentPanel()) document.getElementById(
-                'timeline-bar').style.display = 'none'; }
-
-        function renamePanel(panelId, newName) { const panel = panels.find(p => p.id === panelId); if (panel && newName &&
-                newName.trim()) { panel.name = newName.trim();
-                renderPanelGrid(); if (document.getElementById('gallery-modal').style.display === 'flex') renderGallery();
-                document.getElementById('status').innerHTML = `✏️ Renamed to ${panel.name}`; if (activePanelForTimeline &&
-                    activePanelForTimeline.id === panelId) document.getElementById('current-panel-name').innerText = panel
-                    .name; } }
-
-        function renderPanelGrid() { const gridContainer = document.getElementById('panel-grid');
-            gridContainer.innerHTML = '';
-            panels.forEach(panel => { const card = document.createElement('div');
-                card.className = `panel-card ${currentPanelId === panel.id ? 'active' : ''}`;
-                card.innerHTML =
-                    `<img src="${panel.screenshot}"><div class="panel-name">${panel.name}</div><div class="panel-actions"><button class="capture-panel">📸 Capture</button><button class="duplicate-panel">📋 Duplicate</button><button class="delete-panel">🗑️ Delete</button><button class="timeline-panel">⏲️ Timeline</button></div>`;
-                card.addEventListener('click', (e) => { if (e.target.tagName === 'BUTTON') return;
-                    loadPanel(panel.id); });
-                card.querySelector('.capture-panel').onclick = (e) => { e.stopPropagation();
-                    capturePanel(panel.id); };
-                card.querySelector('.duplicate-panel').onclick = (e) => { e.stopPropagation();
-                    duplicatePanel(panel.id); };
-                card.querySelector('.delete-panel').onclick = (e) => { e.stopPropagation();
-                    deletePanel(panel.id); };
-                card.querySelector('.timeline-panel').onclick = (e) => { e.stopPropagation();
-                    loadPanel(panel.id); };
-                gridContainer.appendChild(card); }); }
-
-        // Panel Grid Zoom
+        // Panel Grid Zoom controls (safe to keep)
         let currentZoom = 0;
         const panelGridEl = document.getElementById('panel-grid');
-        document.getElementById('zoom-in').onclick = () => { currentZoom = Math.min(currentZoom + 0.2, 2);
+        document.getElementById('zoom-in').onclick = () => { 
+            currentZoom = Math.min(currentZoom + 0.2, 2);
             panelGridEl.style.transform = `scale(${1+currentZoom})`;
-            panelGridEl.style.transformOrigin = 'top left'; };
-        document.getElementById('zoom-out').onclick = () => { currentZoom = Math.max(currentZoom - 0.2, -0.4);
+            panelGridEl.style.transformOrigin = 'top left'; 
+        };
+        document.getElementById('zoom-out').onclick = () => { 
+            currentZoom = Math.max(currentZoom - 0.2, -0.4);
             panelGridEl.style.transform = `scale(${1+currentZoom})`;
-            panelGridEl.style.transformOrigin = 'top left'; };
-        document.getElementById('zoom-reset').onclick = () => { currentZoom = 0;
-            panelGridEl.style.transform = 'scale(1)'; };
+            panelGridEl.style.transformOrigin = 'top left'; 
+        };
+        document.getElementById('zoom-reset').onclick = () => { 
+            currentZoom = 0;
+            panelGridEl.style.transform = 'scale(1)'; 
+        };
 
-        // ========== GALLERY ==========
-        function renderGallery() { const scrollDiv = document.getElementById('gallery-scroll');
+        // ========== GALLERY (uses global panels array and collaborative functions) ==========
+        function renderGallery() { 
+            const scrollDiv = document.getElementById('gallery-scroll');
             scrollDiv.innerHTML = '';
-            panels.forEach((panel, idx) => { const div = document.createElement('div');
+            panels.forEach((panel, idx) => { 
+                const div = document.createElement('div');
                 div.className = 'gallery-item';
                 div.draggable = true;
                 div.setAttribute('data-idx', idx);
-                div.innerHTML =
-                    `<img src="${panel.screenshot}"><div class="gallery-item-info"><div class="name">${panel.name}</div><div class="timestamp">${panel.timestamp}</div></div><div class="gallery-actions"><button class="move-up">▲ Up</button><button class="move-down">▼ Down</button><button class="export-image-gallery">🖼️ Export as Image</button><button class="export-animation-gallery">🎬 Export Animation</button><button class="rename-gallery">✏️ Rename</button><button class="delete-gallery">🗑️ Delete</button></div>`;
+                div.innerHTML = `
+                    <img src="${panel.screenshot}">
+                    <div class="gallery-item-info">
+                        <div class="name">${panel.name}</div>
+                        <div class="timestamp">${panel.timestamp}</div>
+                    </div>
+                    <div class="gallery-actions">
+                        <button class="move-up">▲ Up</button>
+                        <button class="move-down">▼ Down</button>
+                        <button class="export-image-gallery">🖼️ Export as Image</button>
+                        <button class="export-animation-gallery">🎬 Export Animation</button>
+                        <button class="rename-gallery">✏️ Rename</button>
+                        <button class="delete-gallery">🗑️ Delete</button>
+                    </div>`;
                 div.querySelector('.move-up').onclick = () => movePanel(idx, idx - 1);
                 div.querySelector('.move-down').onclick = () => movePanel(idx, idx + 1);
                 div.querySelector('.export-image-gallery').onclick = () => exportSinglePanelAsImage(panel);
                 div.querySelector('.export-animation-gallery').onclick = () => exportPanelAnimation(panel);
-                div.querySelector('.rename-gallery').onclick = () => { const newName = prompt('New panel name:',
-                    panel.name); if (newName && newName.trim()) renamePanel(panel.id, newName);
+                div.querySelector('.rename-gallery').onclick = () => { 
+                    const newName = prompt('New panel name:', panel.name); 
+                    if (newName && newName.trim()) window.renamePanel(panel.id, newName);
                     renderGallery();
-                    renderPanelGrid(); };
-                div.querySelector('.delete-gallery').onclick = () => { deletePanel(panel.id);
+                    window.renderPanelGrid(); 
+                };
+                div.querySelector('.delete-gallery').onclick = () => { 
+                    window.deletePanel(panel.id);
                     renderGallery();
-                    renderPanelGrid(); };
+                    window.renderPanelGrid(); 
+                };
                 div.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/plain', idx);
                     div.classList.add('dragging'); });
                 div.addEventListener('dragend', () => div.classList.remove('dragging'));
                 div.addEventListener('dragover', (e) => e.preventDefault());
                 div.addEventListener('drop', (e) => { e.preventDefault();
-                    const fromIdx = parseInt(e.dataTransfer.getData('text/plain')); if (fromIdx !== idx) movePanel(
-                        fromIdx, idx); });
-                scrollDiv.appendChild(div); }); }
+                    const fromIdx = parseInt(e.dataTransfer.getData('text/plain')); 
+                    if (fromIdx !== idx) movePanel(fromIdx, idx); });
+                scrollDiv.appendChild(div); 
+            }); 
+        }
 
-        function movePanel(from, to) { if (to < 0 || to >= panels.length) return;
+        function movePanel(from, to) { 
+            if (to < 0 || to >= panels.length) return;
             const [removed] = panels.splice(from, 1);
             panels.splice(to, 0, removed);
             panels.forEach((p, i) => p.name = `Panel ${i+1}`);
             renderGallery();
-            renderPanelGrid();
-            document.getElementById('status').innerHTML = `🔄 Reordered panels`; }
+            window.renderPanelGrid();
+            document.getElementById('status').innerHTML = `🔄 Reordered panels`; 
+        }
         // ============================================================
         // SECTION END: PANEL_MANAGEMENT_AND_GALLERY
         // ============================================================
