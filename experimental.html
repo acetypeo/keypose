@@ -1,0 +1,3525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>KeyPose Studio – Final with Hold Labels & Easier Dragging</title>
+    <style>
+        /* ============================================================ */
+        /* SECTION START: CSS_STYLES                                     */
+        /* ============================================================ */
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: monospace;
+            user-select: none;
+        }
+        #gear-btn,
+        #panels-btn,
+        #gallery-btn,
+        #debug-btn,
+        #timeline-toggle-btn {
+            position: fixed;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            font-size: 20px;
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 300;
+        }
+        #gear-btn {
+            top: 15px;
+            left: 15px;
+        }
+        #panels-btn {
+            top: 15px;
+            left: 60px;
+            background: #ff8844;
+            color: black;
+        }
+        #gallery-btn {
+            top: 15px;
+            left: 105px;
+            background: #aa66ff;
+            color: white;
+            font-size: 16px;
+        }
+        #debug-btn {
+            bottom: 60px;
+            right: 15px;
+            background: #44aa88;
+            font-size: 16px;
+            z-index: 400;
+        }
+        #timeline-toggle-btn {
+            bottom: 155px;
+            left: 15px;
+            background: #aa66aa;
+            font-size: 18px;
+            z-index: 400;
+        }
+
+        #gear-menu,
+        #panels-menu {
+            position: fixed;
+            top: 60px;
+            background: rgba(0, 0, 0, 0.95);
+            backdrop-filter: blur(12px);
+            padding: 10px;
+            border-radius: 12px;
+            z-index: 300;
+            display: none;
+            border: 1px solid #ff8844;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        #gear-menu {
+            left: 15px;
+            min-width: 280px;
+        }
+        #panels-menu {
+            left: 60px;
+            min-width: 340px;
+        }
+
+        .menu-section {
+            margin-bottom: 12px;
+        }
+        .menu-section-title {
+            color: #ff8844;
+            font-size: 11px;
+            margin-bottom: 5px;
+            padding-bottom: 2px;
+            border-bottom: 1px solid #555;
+        }
+        .menu-item {
+            background: #333;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 11px;
+            margin: 2px 0;
+            width: 100%;
+            text-align: left;
+        }
+        .menu-item:hover {
+            background: #ff8844;
+            color: black;
+        }
+
+        #model-list {
+            margin-top: 5px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        .model-item {
+            background: #2a2a2a;
+            padding: 4px 6px;
+            border-radius: 6px;
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 2px 0;
+        }
+        .model-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .model-bones {
+            color: #ffaa66;
+            margin: 0 6px;
+        }
+        .model-btn {
+            background: #333;
+            border: none;
+            color: white;
+            border-radius: 4px;
+            padding: 2px 6px;
+            margin: 0 2px;
+            cursor: pointer;
+            font-size: 9px;
+        }
+        .model-btn.add {
+            background: #3a6a3a;
+        }
+        .model-btn.add:hover {
+            background: #5a8a5a;
+        }
+        .model-btn.remove {
+            background: #aa3333;
+        }
+        .model-btn.remove:hover {
+            background: #cc5555;
+        }
+
+        #shader-list {
+            margin-top: 5px;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+        .shader-item {
+            background: #5a3a6a;
+            padding: 3px 6px;
+            border-radius: 6px;
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 2px 0;
+            cursor: pointer;
+        }
+        .shader-item.selected {
+            background: #ff8844;
+            color: black;
+        }
+        .remove-shader {
+            background: #aa3333;
+            border: none;
+            color: white;
+            border-radius: 50%;
+            width: 14px;
+            height: 14px;
+            font-size: 9px;
+            cursor: pointer;
+        }
+
+        #param-panel {
+            position: fixed;
+            top: 60px;
+            right: 15px;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(8px);
+            padding: 10px;
+            border-radius: 12px;
+            z-index: 300;
+            display: none;
+            min-width: 260px;
+            border: 1px solid #ff8844;
+            color: white;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        #param-panel h4 {
+            margin: 0 0 8px 0;
+            font-size: 11px;
+            color: #ffaa66;
+        }
+        .param-row {
+            margin-bottom: 8px;
+        }
+        .param-row label {
+            font-size: 10px;
+            display: block;
+            color: #ddd;
+        }
+        .param-row input {
+            width: 100%;
+            cursor: pointer;
+            background: #333;
+            border: 1px solid #666;
+            color: white;
+        }
+        .param-row input[type="color"] {
+            height: 28px;
+            padding: 2px;
+        }
+        .param-row span {
+            font-size: 9px;
+            color: #ffaa66;
+            margin-left: 5px;
+        }
+        .stop-list {
+            background: #1e1e2e;
+            border-radius: 6px;
+            padding: 5px;
+            margin-top: 5px;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+        .stop-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: #2a2a3a;
+            margin: 4px 0;
+            padding: 4px;
+            border-radius: 6px;
+        }
+        .stop-item .pos {
+            width: 45px;
+            font-size: 10px;
+        }
+        .stop-item input[type="range"] {
+            flex: 1;
+            height: 4px;
+        }
+        .stop-item .color-preview {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            border: 1px solid #888;
+            cursor: pointer;
+        }
+        .stop-item button {
+            background: #aa3333;
+            border: none;
+            color: white;
+            border-radius: 4px;
+            width: 22px;
+            height: 22px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .add-stop-btn {
+            background: #3a6a3a;
+            border: none;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 6px;
+            margin-top: 6px;
+            cursor: pointer;
+            font-size: 10px;
+            width: 100%;
+        }
+        .gradient-preview {
+            height: 20px;
+            border-radius: 4px;
+            margin: 8px 0;
+            background: linear-gradient(to right, #000, #fff);
+        }
+        .close-param {
+            position: absolute;
+            top: 5px;
+            right: 8px;
+            background: #aa3333;
+            border: none;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        #mode-buttons {
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            z-index: 200;
+            display: flex;
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 5px 10px;
+            border-radius: 30px;
+        }
+        .mode-btn {
+            background: #333;
+            color: white;
+            border: none;
+            padding: 4px 10px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .mode-btn.active {
+            background: #ff8844;
+            color: black;
+        }
+
+        #status {
+            position: fixed;
+            bottom: 60px;
+            left: 60px;
+            background: rgba(0, 0, 0, 0.7);
+            color: #88ff88;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 10px;
+            z-index: 200;
+            pointer-events: none;
+            font-family: monospace;
+        }
+        .instruction {
+            position: fixed;
+            bottom: 60px;
+            right: 60px;
+            background: rgba(0, 0, 0, 0.5);
+            color: #aaa;
+            padding: 3px 8px;
+            border-radius: 15px;
+            font-size: 9px;
+            z-index: 200;
+            pointer-events: none;
+        }
+
+        .panel-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 8px;
+            margin-top: 8px;
+            max-height: 400px;
+            overflow-y: auto;
+            transition: transform 0.2s ease;
+        }
+        .panel-grid.zoomed-in {
+            transform: scale(1.2);
+            transform-origin: top left;
+        }
+        .panel-grid.zoomed-out {
+            transform: scale(0.8);
+            transform-origin: top left;
+        }
+        .zoom-controls {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+            justify-content: flex-end;
+        }
+        .zoom-controls button {
+            background: #333;
+            border: none;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 11px;
+        }
+        .zoom-controls button:hover {
+            background: #ff8844;
+        }
+
+        .panel-card {
+            background: #1e1e2e;
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: 0.1s;
+        }
+        .panel-card.active {
+            border-color: #ff8844;
+        }
+        .panel-card img {
+            width: 100%;
+            aspect-ratio: auto;
+            object-fit: contain;
+            background: #111;
+        }
+        .panel-card .panel-name {
+            padding: 4px;
+            font-size: 9px;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.7);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: white;
+        }
+        .panel-actions {
+            display: flex;
+            justify-content: space-around;
+            padding: 4px;
+            background: #2a2a3a;
+        }
+        .panel-actions button {
+            background: #333;
+            border: none;
+            color: white;
+            font-size: 9px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .panel-actions button:hover {
+            background: #ff8844;
+        }
+
+        .gallery-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.96);
+            z-index: 1000;
+            display: none;
+            flex-direction: column;
+            backdrop-filter: blur(8px);
+        }
+        .gallery-header {
+            padding: 15px;
+            background: #111;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #ff8844;
+        }
+        .gallery-header h2 {
+            margin: 0;
+            color: #ff8844;
+            font-size: 1.2rem;
+        }
+        .gallery-close {
+            background: #aa3333;
+            border: none;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+        }
+        .gallery-scroll {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .gallery-item {
+            display: flex;
+            align-items: center;
+            background: #1e1e2e;
+            border-radius: 12px;
+            padding: 10px;
+            cursor: grab;
+            transition: 0.1s;
+            border: 1px solid #444;
+        }
+        .gallery-item.dragging {
+            opacity: 0.5;
+            cursor: grabbing;
+        }
+        .gallery-item img {
+            width: 160px;
+            object-fit: contain;
+            background: #111;
+            border-radius: 6px;
+            margin-right: 15px;
+        }
+        .gallery-item-info {
+            flex: 1;
+        }
+        .gallery-item-info .name {
+            font-size: 14px;
+            font-weight: bold;
+            color: #ffaa66;
+        }
+        .gallery-item-info .timestamp {
+            font-size: 10px;
+            color: #888;
+        }
+        .gallery-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .gallery-actions button {
+            background: #333;
+            border: none;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 11px;
+        }
+        .gallery-actions button:hover {
+            background: #ff8844;
+        }
+        .export-pdf-btn {
+            background: #44aa44;
+            margin-left: 10px;
+        }
+        .capture-settings {
+            margin-top: 8px;
+            padding: 5px;
+            background: #2a2a3a;
+            border-radius: 6px;
+        }
+        .capture-settings select,
+        .capture-settings label {
+            font-size: 10px;
+            margin: 2px 0;
+            display: block;
+        }
+        .capture-settings select {
+            background: #333;
+            color: white;
+            border: 1px solid #ff8844;
+            border-radius: 4px;
+            padding: 2px;
+        }
+        .progress-container {
+            position: fixed;
+            bottom: 50px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 20px;
+            padding: 5px 12px;
+            font-size: 11px;
+            color: #ffaa66;
+            display: none;
+            z-index: 250;
+            backdrop-filter: blur(4px);
+            pointer-events: none;
+        }
+        .loading-spinner {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #ff8844;
+            animation: spin 0.6s linear infinite;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        .bin-warning {
+            position: fixed;
+            bottom: 50px;
+            right: 15px;
+            background: #aa4444;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 10px;
+            z-index: 200;
+            display: none;
+        }
+        .debug-panel {
+            position: fixed;
+            bottom: 100px;
+            right: 15px;
+            background: #1e1e2e;
+            color: #0f0;
+            font-size: 10px;
+            padding: 8px;
+            border-radius: 8px;
+            width: 400px;
+            max-width: 80vw;
+            max-height: 200px;
+            overflow: auto;
+            z-index: 500;
+            display: none;
+            border: 1px solid #ff8844;
+            font-family: monospace;
+            white-space: pre-wrap;
+            pointer-events: auto;
+        }
+        .copy-debug-btn {
+            position: absolute;
+            bottom: 4px;
+            right: 4px;
+            background: #333;
+            border: none;
+            color: white;
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-size: 9px;
+            cursor: pointer;
+            z-index: 501;
+        }
+
+        #timeline-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 145px;
+            background: rgba(20, 20, 30, 0.95);
+            backdrop-filter: blur(8px);
+            border-top: 2px solid #ff8844;
+            z-index: 500;
+            display: flex;
+            flex-direction: column;
+            font-family: monospace;
+            color: white;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.5);
+            transition: transform 0.2s ease;
+        }
+        #timeline-bar.collapsed {
+            transform: translateY(100%);
+        }
+        #timeline-bar.selected-shift {
+            transform: translateY(15px);
+        }
+
+        .timeline-toolbar {
+            display: flex;
+            gap: 12px;
+            padding: 6px 12px;
+            background: #0a0a12;
+            border-bottom: 1px solid #333;
+            font-size: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .timeline-toolbar button {
+            background: #333;
+            border: none;
+            color: white;
+            padding: 3px 12px;
+            border-radius: 16px;
+            cursor: pointer;
+            font-size: 11px;
+        }
+        .timeline-toolbar button:hover {
+            background: #ff8844;
+        }
+        .timeline-toolbar input {
+            background: #222;
+            border: 1px solid #ff8844;
+            color: white;
+            text-align: center;
+            border-radius: 4px;
+        }
+        .timeline-canvas-container {
+            flex: 1;
+            position: relative;
+            background: #1a1a2a;
+            margin: 4px 8px 4px 8px;
+            border-radius: 6px;
+            overflow: hidden;
+            cursor: default;
+        }
+        canvas#timelineCanvas {
+            width: 100%;
+            height: 100%;
+            background: #1e1e2e;
+            display: block;
+        }
+        .timeline-info {
+            font-size: 10px;
+            padding: 2px 12px;
+            background: #0a0a12;
+            display: flex;
+            justify-content: space-between;
+            border-top: 1px solid #333;
+        }
+        #current-panel-name {
+            color: #ff8844;
+            font-weight: bold;
+        }
+        .copy-paste-group {
+            display: inline-flex;
+            gap: 4px;
+            background: #2a2a3a;
+            padding: 0 6px;
+            border-radius: 16px;
+        }
+        .selected-keyframe-badge {
+            background: #ff8844;
+            color: black;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+        }
+        #view-shot-btn {
+            background: #3a6a8a;
+        }
+
+        .timeline-context-menu {
+            position: fixed;
+            background: #2a2a3a;
+            border: 1px solid #ff8844;
+            border-radius: 8px;
+            z-index: 2000;
+            display: none;
+            flex-direction: column;
+            min-width: 180px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        }
+        .timeline-context-menu button {
+            background: none;
+            border: none;
+            color: white;
+            padding: 6px 12px;
+            text-align: left;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .timeline-context-menu button:hover {
+            background: #ff8844;
+            color: black;
+        }
+        .timeline-context-menu hr {
+            margin: 4px 0;
+            border-color: #555;
+        }
+
+        .preview-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #1a1a2e;
+            border: 2px solid #ff8844;
+            border-radius: 12px;
+            z-index: 2000;
+            display: none;
+            flex-direction: column;
+            width: 900px;
+            max-width: 90vw;
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
+        }
+        .preview-header {
+            padding: 10px 15px;
+            background: #0a0a12;
+            border-bottom: 1px solid #ff8844;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .preview-header h3 {
+            margin: 0;
+            color: #ff8844;
+            font-size: 14px;
+        }
+        .preview-header button {
+            background: #aa3333;
+            border: none;
+            color: white;
+            padding: 4px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+        }
+        .preview-canvas-container {
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #111;
+            position: relative;
+        }
+        canvas#previewCanvas {
+            width: 100%;
+            max-height: 60vh;
+            background: #1a1a2e;
+            border-radius: 4px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+        .preview-controls {
+            padding: 10px 15px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            border-top: 1px solid #333;
+            background: #0a0a12;
+        }
+        .preview-controls button {
+            background: #333;
+            border: none;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+        }
+        .preview-controls button:hover {
+            background: #ff8844;
+        }
+        .preview-controls input {
+            flex: 1;
+            cursor: pointer;
+            background: #333;
+            height: 4px;
+            border-radius: 2px;
+        }
+        .preview-time {
+            font-size: 11px;
+            color: #ffaa66;
+            min-width: 100px;
+            text-align: center;
+        }
+        /* ============================================================ */
+        /* SECTION END: CSS_STYLES                                       */
+        /* ============================================================ */
+    </style>
+</head>
+<body>
+    <!-- ============================================================ -->
+<!-- SECTION START: HTML_BUTTONS_AND_MAIN_ELEMENTS                 -->
+<!-- ============================================================ -->
+<button id="gear-btn">⚙️</button>
+<button id="panels-btn">🎬</button>
+<button id="gallery-btn">🖼️</button>
+<button id="debug-btn">🐛</button>
+<button id="timeline-toggle-btn">⏲️</button>
+
+<div id="gear-menu">
+    <div class="menu-section">
+        <div class="menu-section-title">📁 Models (GLTF/GLB + BIN + Textures)</div>
+        <input type="file" id="fileInput" multiple style="width:100%; background:#444; color:white; border:none; padding:4px; border-radius:6px; font-size:10px;">
+        <div style="font-size:9px; color:#ffaa66; margin-top:4px;">✅ Select .gltf + all .bin + all .png together</div>
+        <div id="model-list"></div>
+    </div>
+    <div class="menu-section">
+        <div class="menu-section-title">🎨 Global Shaders</div>
+        <button class="menu-item" id="add-cel">🎬 Add Cel Shading</button>
+        <button class="menu-item" id="add-exposure">🌞 Add Exposure</button>
+        <button class="menu-item" id="add-greyscale">⚫ Add Greyscale</button>
+        <button class="menu-item" id="add-gradient">🎨 Add Gradient Map (Multi‑stop)</button>
+        <div id="shader-list"></div>
+    </div>
+    <div class="menu-section">
+        <div class="menu-section-title">📸 Export Settings (Aspect / Margins)</div>
+        <div class="capture-settings">
+            <label>Aspect Ratio:</label>
+            <select id="capture-aspect">
+                <option value="screen">Screen (current)</option>
+                <option value="16:9">16:9 (widescreen)</option>
+                <option value="4:3">4:3 (standard)</option>
+                <option value="1:1">1:1 (square)</option>
+                <option value="b4">Manga B4 (257x364mm)</option>
+                <option value="shonen">Shonen Jump Basic (180x270mm)</option>
+                <option value="a4">A4 (210x297mm)</option>
+                <option value="b5">B5 (182x257mm)</option>
+                <option value="tankobon">Tankobon (128x182mm)</option>
+            </select>
+            <label style="margin-top:5px;">
+                <input type="checkbox" id="capture-margins"> Overlay Manga Margins (blue/red/green)
+            </label>
+            <label style="margin-top:5px;">
+                <input type="checkbox" id="use-jpeg" checked> Use JPEG (high quality, smaller PDF)
+            </label>
+        </div>
+    </div>
+    <div class="menu-section">
+        <div class="menu-section-title">💾 Project (Full Save – Everything Intact)</div>
+        <button class="menu-item" id="save-full-project">💾 Save Full Project</button>
+        <button class="menu-item" id="load-full-project">📂 Load Full Project</button>
+        <div style="font-size:9px;color:#ffaa66;margin-top:4px;">✅ Saves models, panels, timeline, shaders, FPS — exactly as is</div>
+    </div>
+    <!-- ========== NEW COLLABORATION SECTION ========== -->
+    <div class="menu-section">
+        <div class="menu-section-title">🌐 COLLABORATION (P2P)</div>
+        <button class="menu-item" id="host-collab-btn">🎥 Host Session</button>
+        <button class="menu-item" id="join-collab-btn">🔗 Join Session</button>
+        <div id="collab-status" style="font-size:9px; color:#ffaa66; margin-top:4px;">⚪ Not connected</div>
+        <button class="menu-item" id="copy-invite-btn" style="display:none;">📋 Copy Invite Link</button>
+    </div>
+</div>
+
+<div id="panels-menu">
+    <div class="menu-section">
+        <div class="menu-section-title">🎞️ STORYBOARD PANELS</div>
+        <button class="menu-item" id="new-panel">➕ New Panel</button>
+        <div class="zoom-controls">
+            <button id="zoom-out">🔍−</button>
+            <button id="zoom-in">🔍+</button>
+            <button id="zoom-reset">⟲ Reset</button>
+        </div>
+        <div id="panel-grid" class="panel-grid"></div>
+    </div>
+</div>
+
+<div id="param-panel">
+    <button class="close-param" id="close-param">✕</button>
+    <h4 id="param-title">Parameters</h4>
+    <div id="param-content"></div>
+</div>
+
+<div id="mode-buttons">
+    <button id="btn-translate" class="mode-btn active">↔️ Move</button>
+    <button id="btn-rotate" class="mode-btn">🔄 Rotate</button>
+    <button id="btn-bones" class="mode-btn">👁️ Hide Bones</button>
+</div>
+
+<div id="status">✅ KeyPose | Camera on ones | Hold only affects character | Drag arrow to set hold frames</div>
+<div class="instruction">⚙️ Gear | 🎬 Panels | 🖼️ Gallery | ⏲️ Timeline</div>
+<div id="progress-container" class="progress-container"></div>
+<div id="bin-warning" class="bin-warning"></div>
+<div id="debug-panel" class="debug-panel"></div>
+
+<div id="gallery-modal" class="gallery-modal">
+    <div class="gallery-header">
+        <h2>📋 Storyboard Gallery</h2>
+        <div>
+            <button id="export-full-frame-seq-btn" class="export-pdf-btn" style="background:#ff8844; margin-right:10px;">🎬 Export Full Frame Sequence</button>
+            <button id="export-pdf-gallery-btn" class="export-pdf-btn">📄 Export as PDF</button>
+            <button id="close-gallery" class="gallery-close">Close</button>
+        </div>
+    </div>
+    <div id="gallery-scroll" class="gallery-scroll"></div>
+</div>
+
+<div id="timeline-bar" style="display: none;">
+    <div class="timeline-toolbar">
+        <span>🎬 <span id="current-panel-name">No panel</span></span>
+        <button id="timeline-add-key-btn">➕ Keyframe</button>
+        <button id="timeline-update-key-btn" style="background:#3a6a6a;">✏️ Update Selected</button>
+        <button id="timeline-play-btn">▶️ Play</button>
+        <button id="timeline-stop-btn">⏹️ Stop</button>
+        <span>Dur: <input type="number" id="timeline-duration-input" value="2.0" step="0.1" min="0.5" style="width:55px;"> sec</span>
+        <span>FPS: <input type="number" id="fps-input" value="24" min="1" max="60" style="width:55px;"></span>
+        <span>Snap: <input type="checkbox" id="timeline-snap" checked> to 0.1s</span>
+        <button id="view-shot-btn">🎬 Preview</button>
+        <span id="selected-keyframe-status" class="selected-keyframe-badge" style="display:none;">🔑 Keyframe selected</span>
+    </div>
+    <div class="timeline-canvas-container">
+        <canvas id="timelineCanvas" width="1000" height="80" style="width:100%; height:100%;"></canvas>
+    </div>
+    <div class="timeline-info">
+        <span>💡 Drag orange arrow → hold frames | Right‑click → more | Camera on ones, character respects holds</span>
+        <span>🎞️ <span id="current-time-display">0.00</span> / <span id="total-time-display">2.00</span> sec</span>
+    </div>
+</div>
+
+<div id="timeline-context-menu" class="timeline-context-menu">
+    <button id="ctx-copy">📋 Copy Keyframe</button>
+    <button id="ctx-paste">📎 Paste Keyframe</button>
+    <hr>
+    <button id="ctx-delete">🗑️ Delete Keyframe</button>
+    <hr>
+    <button id="ctx-update">✏️ Update Selected</button>
+    <hr>
+    <button id="ctx-set-frame">🎞️ Set Frame Number</button>
+    <button id="ctx-set-hold">⏱️ Set Hold Frames</button>
+    <button id="ctx-toggle-interp">🔄 Toggle Interpolation (Linear/Step)</button>
+</div>
+
+<div id="preview-modal" class="preview-modal">
+    <div class="preview-header">
+        <h3>🎬 Preview - <span id="preview-panel-name"></span></h3>
+        <button id="close-preview">Close</button>
+    </div>
+    <div class="preview-canvas-container">
+        <canvas id="previewCanvas" width="800" height="450"></canvas>
+    </div>
+    <div class="preview-controls">
+        <button id="preview-play">▶️ Play</button>
+        <button id="preview-stop">⏹️ Stop</button>
+        <input type="range" id="preview-scrub" min="0" max="1" step="0.001" value="0">
+        <span id="preview-time" class="preview-time">0.00 / 0.00 sec</span>
+    </div>
+</div>
+<!-- ============================================================ -->
+<!-- SECTION END: HTML_BUTTONS_AND_MAIN_ELEMENTS                   -->
+<!-- ============================================================ -->
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.128.0/examples/jsm/"
+            }
+        }
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js">
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js">
+    </script>
+
+    <script type="module">
+        // ============================================================
+// SECTION START: IMPORTS_AND_CORE_SETUP
+// ============================================================
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { TransformControls } from 'three/addons/controls/TransformControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+
+// ========== YJS COLLABORATION IMPORTS (working CDN) ==========
+import * as Y from 'https://esm.sh/yjs@13.6.15';
+import { WebrtcProvider } from 'https://esm.sh/y-webrtc@10.3.0';
+
+// ========== CORE SETUP ==========
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1a1a2e);
+const gridHelper = new THREE.GridHelper(8, 20, 0x888888, 0x444444);
+gridHelper.position.y = -1.2;
+scene.add(gridHelper);
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+camera.position.set(3, 2.5, 5);
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+const composer = new EffectComposer(renderer);
+const renderPass = new RenderPass(scene, camera);
+composer.addPass(renderPass);
+const ambient = new THREE.AmbientLight(0x404060);
+scene.add(ambient);
+const keyLight = new THREE.DirectionalLight(0xffccaa, 1.2);
+keyLight.position.set(3, 5, 2);
+keyLight.castShadow = true;
+scene.add(keyLight);
+const fillLight = new THREE.PointLight(0x88aaff, 0.4);
+fillLight.position.set(-1, 1, 2);
+scene.add(fillLight);
+const rimLight = new THREE.PointLight(0xffaa66, 0.4);
+rimLight.position.set(0, 1.5, -2.5);
+scene.add(rimLight);
+const gizmo = new TransformControls(camera, renderer.domElement);
+gizmo.addEventListener('dragging-changed', (e) => { orbit.enabled = !e.value; });
+scene.add(gizmo);
+const orbit = new OrbitControls(camera, renderer.domElement);
+orbit.enableDamping = true;
+orbit.target.set(0, 0.8, 0);
+
+// ========== YJS GLOBALS (initially inactive) ==========
+let ydoc = null;           // Yjs document – created when host/join starts
+let provider = null;       // WebRTC provider
+let isCollaborative = false; // flag to know if we are in a session
+let sharedPanels = null;   // Y.Array
+let sharedTimelines = null; // Y.Map
+let awareness = null;      // Yjs awareness (for user presence)
+
+// ============================================================
+// SECTION END: IMPORTS_AND_CORE_SETUP
+// ============================================================
+
+// ============================================================
+// SECTION START: COLLAB_SYSTEM
+// ============================================================
+// This section adds P2P collaboration via Yjs + WebRTC.
+// It uses the globals defined above.
+// ============================================================
+
+function updateCollabStatus(message, isConnected = false) {
+    const statusDiv = document.getElementById('collab-status');
+    if (statusDiv) {
+        statusDiv.innerHTML = message;
+        statusDiv.style.color = isConnected ? '#88ff88' : '#ffaa66';
+    }
+}
+
+function generateRoomName() {
+    return 'keypose_' + Math.random().toString(36).substring(2, 10);
+}
+
+function startCollabSession(roomName, userName, isHost) {
+    if (ydoc) {
+        if (provider) provider.destroy();
+        ydoc.destroy();
+    }
+    
+    ydoc = new Y.Doc();
+    sharedPanels = ydoc.getArray('panels');
+    sharedTimelines = ydoc.getMap('timelines');
+    awareness = ydoc.getAwareness();
+    awareness.setLocalState({ user: { name: userName, color: '#ff8844' } });
+    
+    provider = new WebrtcProvider(roomName, ydoc, {
+        signaling: ['wss://signaling.yjs.dev'], // Public signaling server – replace with your own for production
+        password: null, // No password – open session
+    });
+    
+    provider.on('synced', (synced) => {
+        if (synced) {
+            isCollaborative = true;
+            updateCollabStatus(`✅ Connected to room: ${roomName} as ${userName}`, true);
+            if (window.syncPanelsFromYjs) window.syncPanelsFromYjs();
+            if (window.initCollabPanels) window.initCollabPanels();
+            if (window.initCollabTimelines) window.initCollabTimelines();
+            
+            const copyBtn = document.getElementById('copy-invite-btn');
+            if (copyBtn) {
+                copyBtn.style.display = 'inline-block';
+                copyBtn.onclick = () => {
+                    const inviteLink = `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(roomName)}`;
+                    navigator.clipboard.writeText(inviteLink);
+                    updateCollabStatus(`📋 Invite link copied!`, true);
+                };
+            }
+        } else {
+            updateCollabStatus(`⚠️ Connecting to room: ${roomName}...`, false);
+        }
+    });
+    
+    provider.on('connection-error', (err) => {
+        console.error('WebRTC connection error', err);
+        updateCollabStatus(`❌ Connection error: ${err.message || 'unknown'}`, false);
+    });
+    
+    awareness.on('change', () => {
+        const userCount = awareness.getStates().size;
+        updateCollabStatus(`✅ Connected (${userCount} user${userCount !== 1 ? 's' : ''}) in room: ${roomName}`, true);
+    });
+    
+    updateCollabStatus(`🔄 Starting session...`, false);
+}
+
+function leaveCollabSession() {
+    if (provider) { provider.destroy(); provider = null; }
+    if (ydoc) { ydoc.destroy(); ydoc = null; }
+    sharedPanels = sharedTimelines = awareness = null;
+    isCollaborative = false;
+    updateCollabStatus(`⚪ Not connected`, false);
+    const copyBtn = document.getElementById('copy-invite-btn');
+    if (copyBtn) copyBtn.style.display = 'none';
+}
+
+function setupCollabUI() {
+    const hostBtn = document.getElementById('host-collab-btn');
+    const joinBtn = document.getElementById('join-collab-btn');
+    
+    if (hostBtn) {
+        hostBtn.onclick = () => {
+            let roomName = prompt('Enter a room name (or leave empty for random):');
+            if (roomName === null) return;
+            if (!roomName.trim()) roomName = generateRoomName();
+            const userName = prompt('Enter your name:', `Host_${Math.floor(Math.random()*1000)}`);
+            if (!userName) return;
+            startCollabSession(roomName, userName, true);
+        };
+    }
+    
+    if (joinBtn) {
+        joinBtn.onclick = () => {
+            let roomName = prompt('Enter the room name to join:');
+            if (!roomName) return;
+            const userName = prompt('Enter your name:', `Guest_${Math.floor(Math.random()*1000)}`);
+            if (!userName) return;
+            startCollabSession(roomName, userName, false);
+        };
+    }
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomParam = urlParams.get('room');
+    if (roomParam) {
+        setTimeout(() => {
+            const userName = prompt(`Auto-join room "${roomParam}". Enter your name:`, `Guest_${Math.floor(Math.random()*1000)}`);
+            if (userName) startCollabSession(roomParam, userName, false);
+        }, 500);
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupCollabUI);
+} else {
+    setupCollabUI();
+}
+
+window.isInCollaborativeSession = () => isCollaborative;
+window.leaveCollabSession = leaveCollabSession;
+
+// ============================================================
+// SECTION END: COLLAB_SYSTEM
+// ============================================================
+
+        // ============================================================
+        // SECTION START: SHADER_SYSTEM
+        // ============================================================
+        function createGradientTexture(stops) { const w = 256;
+            const c = document.createElement('canvas');
+            c.width = w;
+            c.height = 1;
+            const ctx = c.getContext('2d');
+            const g = ctx.createLinearGradient(0, 0, w, 0); for (let s of stops) g.addColorStop(s.pos,
+                `rgb(${s.color.r*255},${s.color.g*255},${s.color.b*255})`);
+            ctx.fillStyle = g;
+            ctx.fillRect(0, 0, w, 1);
+            const t = new THREE.CanvasTexture(c);
+            t.needsUpdate = true; return t; }
+        const shaderDefs = {
+            cel: { name: 'Cel Shading', params: { colorSteps: 4, shadowSoftness: 1.2, highlightThreshold: 0.7,
+                    shadowThreshold: 0.3, contrast: 1.0, brightness: 1.0 }, createPass: () => new ShaderPass({ uniforms: {
+                        tDiffuse: { value: null }, colorSteps: { value: 4 }, shadowSoftness: { value: 1.2 },
+                        highlightThreshold: { value: 0.7 }, shadowThreshold: { value: 0.3 }, contrast: { value: 1.0 },
+                        brightness: { value: 1.0 } }, vertexShader:
+                        `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+                    fragmentShader: `uniform sampler2D tDiffuse; uniform float colorSteps; uniform float shadowSoftness; uniform float highlightThreshold; uniform float shadowThreshold; uniform float contrast; uniform float brightness; varying vec2 vUv; void main() { vec4 color = texture2D(tDiffuse, vUv); vec3 rgb = color.rgb * brightness; rgb = (rgb - 0.5) * contrast + 0.5; float luma = dot(rgb, vec3(0.299, 0.587, 0.114)); float steps = colorSteps; float banded = floor(luma * steps) / steps; if (luma < shadowThreshold) banded = banded * (1.0 - shadowSoftness * 0.5); if (luma > highlightThreshold) banded = banded + (1.0 - banded) * 0.5; vec3 final = rgb * (banded / max(luma, 0.01)); final = clamp(final, 0.0, 1.0); gl_FragColor = vec4(final, color.a); }`
+                }), updatePass: (pass, p) => { if (pass) { pass.uniforms.colorSteps.value = p.colorSteps;
+                        pass.uniforms.shadowSoftness.value = p.shadowSoftness;
+                        pass.uniforms.highlightThreshold.value = p.highlightThreshold;
+                        pass.uniforms.shadowThreshold.value = p.shadowThreshold;
+                        pass.uniforms.contrast.value = p.contrast;
+                        pass.uniforms.brightness.value = p.brightness; } } },
+            exposure: { name: 'Exposure/Contrast', params: { exposure: 1.0, contrast: 1.0, brightness: 1.0 },
+                createPass: () => new ShaderPass({ uniforms: { tDiffuse: { value: null }, exposure: { value: 1.0 },
+                        contrast: { value: 1.0 }, brightness: { value: 1.0 } }, vertexShader:
+                        `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+                    fragmentShader:
+                        `uniform sampler2D tDiffuse; uniform float exposure; uniform float contrast; uniform float brightness; varying vec2 vUv; void main() { vec4 color = texture2D(tDiffuse, vUv); color.rgb = color.rgb * exposure * brightness; color.rgb = (color.rgb - 0.5) * contrast + 0.5; gl_FragColor = color; }`
+                }), updatePass: (pass, p) => { if (pass) { pass.uniforms.exposure.value = p.exposure;
+                        pass.uniforms.contrast.value = p.contrast;
+                        pass.uniforms.brightness.value = p.brightness; } } },
+            greyscale: { name: 'Greyscale', params: { intensity: 1.0, brightness: 1.0, contrast: 1.0 }, createPass: () =>
+                    new ShaderPass({ uniforms: { tDiffuse: { value: null }, intensity: { value: 1.0 }, brightness: { value: 1.0 },
+                            contrast: { value: 1.0 } }, vertexShader:
+                            `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+                        fragmentShader:
+                            `uniform sampler2D tDiffuse; uniform float intensity; uniform float brightness; uniform float contrast; varying vec2 vUv; void main() { vec4 color = texture2D(tDiffuse, vUv); color.rgb = color.rgb * brightness; color.rgb = (color.rgb - 0.5) * contrast + 0.5; float grey = dot(color.rgb, vec3(0.299, 0.587, 0.114)); color.rgb = mix(color.rgb, vec3(grey), intensity); gl_FragColor = color; }`
+                    }), updatePass: (pass, p) => { if (pass) { pass.uniforms.intensity.value = p.intensity;
+                        pass.uniforms.brightness.value = p.brightness;
+                        pass.uniforms.contrast.value = p.contrast; } } },
+            gradient: { name: 'Gradient Map', params: { stops: [{ pos: 0, color: new THREE.Color(0, 0, 0) }, { pos: 1,
+                        color: new THREE.Color(1, 1, 1) }], intensity: 1.0 }, createPass: () => { const tex =
+                        createGradientTexture([{ pos: 0, color: new THREE.Color(0, 0, 0) }, { pos: 1, color: new THREE.Color(
+                                1, 1, 1) }]); return new ShaderPass({ uniforms: { tDiffuse: { value: null },
+                            gradientTex: { value: tex }, intensity: { value: 1.0 } }, vertexShader:
+                            `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+                        fragmentShader:
+                            `uniform sampler2D tDiffuse; uniform sampler2D gradientTex; uniform float intensity; varying vec2 vUv; void main() { vec4 color = texture2D(tDiffuse, vUv); float luma = dot(color.rgb, vec3(0.299, 0.587, 0.114)); vec3 mapped = texture2D(gradientTex, vec2(luma, 0.5)).rgb; vec3 final = mix(color.rgb, mapped, intensity); gl_FragColor = vec4(final, color.a); }`
+                    }); }, updatePass: (pass, p) => { if (pass && p.stops && p.stops.length >= 2) { const newTex =
+                        createGradientTexture(p.stops); if (pass.uniforms.gradientTex.value) pass.uniforms.gradientTex.value
+                        .dispose();
+                    pass.uniforms.gradientTex.value = newTex;
+                    pass.uniforms.intensity.value = p.intensity; } } }
+        };
+
+        let globalShaders = [],
+            currentSelectedShader = null,
+            activeModel = null,
+            loadedModels = [],
+            mixerMap = new Map(),
+            bonesVisible = true;
+        let allUploadedFiles = [];
+
+        async function readFileAsBase64(file) { return new Promise((resolve) => { const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.readAsDataURL(file); }); }
+
+        function createBoneMarkers(model, bones) { const markers = []; let markerScale = Math.max(0.1, Math.min(0.28, 0.28 * (
+                50 / Math.max(bones.length, 1)))); for (const bone of bones) { const canvas = document.createElement(
+                    'canvas');
+                canvas.width = 64;
+                canvas.height = 64;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = 'rgba(0,0,0,0)';
+                ctx.fillRect(0, 0, 64, 64);
+                ctx.font = '48px "Segoe UI Emoji"';
+                ctx.fillStyle = '#ff8844';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('🦴', 32, 32);
+                const tex = new THREE.CanvasTexture(canvas);
+                const spriteMat = new THREE.SpriteMaterial({ map: tex, depthTest: false });
+                const sprite = new THREE.Sprite(spriteMat);
+                sprite.scale.set(markerScale, markerScale, 1);
+                sprite.userData = { bone, model };
+                markers.push(sprite); } return markers; }
+
+        function updateMarkersPosition(markers) { markers.forEach(m => { const bone = m.userData.bone; if (bone) { const
+                    pos = bone.getWorldPosition(new THREE.Vector3());
+                    m.position.copy(pos.clone().add(new THREE.Vector3(0.12, 0.12, 0.12))); } }); }
+
+        function addModelToScene(modelObj) { if (!modelObj || modelObj.userData.inScene) return;
+            scene.add(modelObj); if (modelObj.userData.markers) modelObj.userData.markers.forEach(m => scene.add(m));
+            modelObj.userData.inScene = true; if (!activeModel) setActiveModel(modelObj);
+            document.getElementById('status').innerHTML = `➕ Added ${modelObj.userData.name}`; }
+
+        function removeModelFromScene(modelObj) { if (!modelObj || !modelObj.userData.inScene) return;
+            scene.remove(modelObj); if (modelObj.userData.markers) modelObj.userData.markers.forEach(m => scene.remove(
+            m));
+            modelObj.userData.inScene = false; if (activeModel === modelObj) { activeModel = null;
+                gizmo.detach();
+                const anyInScene = loadedModels.find(m => m.userData.inScene); if (anyInScene) setActiveModel(
+                anyInScene); }
+            document.getElementById('status').innerHTML = `➖ Removed ${modelObj.userData.name}`; }
+
+        function setActiveModel(model) { activeModel = model; if (model && model.userData.bones?.length) gizmo.attach(model
+                .userData.bones[0]); else gizmo.detach();
+            rebuildComposerForModel(model);
+            updateShaderListUI();
+            document.getElementById('status').innerHTML = `🎯 Active: ${model.userData.name}`; }
+
+        function rebuildComposerForModel(model) { if (!model) return; while (composer.passes.length > 1) composer.removePass(
+                composer.passes[1]);
+            globalShaders.forEach(shader => { if (shader.pass) { composer.addPass(shader.pass);
+                    shader.pass.renderToScreen = false; } }); if (composer.passes.length > 0) composer.passes[composer.passes
+                .length - 1].renderToScreen = true; }
+
+        function addShaderToModel(model, type) { const def = shaderDefs[type]; if (!def || globalShaders.some(s => s.type ===
+                type)) return;
+            let params = JSON.parse(JSON.stringify(def.params)); if (type === 'gradient') { params.stops = [{ pos: 0,
+                    color: new THREE.Color(0, 0, 0) }, { pos: 1, color: new THREE.Color(1, 1, 1) }]; }
+            const newShader = { type, params, pass: def.createPass() };
+            def.updatePass(newShader.pass, newShader.params);
+            globalShaders.push(newShader);
+            updateShaderListUI(); if (model === activeModel) rebuildComposerForModel(model);
+            document.getElementById('status').innerHTML = `➕ Added ${def.name}`; }
+
+        function removeShaderFromModel(model, index) { const removed = globalShaders[index]; if (!removed) return; if (removed
+                .type === 'gradient' && removed.params.gradientTex) removed.params.gradientTex.dispose();
+            globalShaders.splice(index, 1);
+            updateShaderListUI(); if (model === activeModel) rebuildComposerForModel(model);
+            document.getElementById('status').innerHTML = `➖ Removed`; }
+
+        function updateShaderListUI() { const container = document.getElementById('shader-list');
+            container.innerHTML = '';
+            globalShaders.forEach((shader, idx) => { const def = shaderDefs[shader.type];
+                const div = document.createElement('div');
+                div.className = `shader-item ${currentSelectedShader === shader ? 'selected' : ''}`;
+                div.innerHTML =
+                    `<span>${def?.name || shader.type}</span><button class="remove-shader" data-idx="${idx}">✕</button>`;
+                div.onclick = (e) => { if (!e.target.classList.contains('remove-shader')) selectShader(shader,
+                    idx); };
+                div.querySelector('.remove-shader').onclick = (e) => { e.stopPropagation();
+                    removeShaderFromModel(activeModel, idx); };
+                container.appendChild(div); }); }
+
+        function selectShader(shader, idx) { currentSelectedShader = shader;
+            updateShaderListUI();
+            const def = shaderDefs[shader.type];
+            const panelDiv = document.getElementById('param-panel');
+            document.getElementById('param-title').innerHTML = def.name;
+            const content = document.getElementById('param-content');
+            content.innerHTML = ''; if (shader.type === 'gradient') { const stops = shader.params.stops;
+                const stopListDiv = document.createElement('div');
+                stopListDiv.className = 'stop-list';
+                const refreshStops = () => { stopListDiv.innerHTML = '';
+                    stops.sort((a, b) => a.pos - b.pos); for (let i = 0; i < stops.length; i++) { const s = stops[
+                        i];
+                        const row = document.createElement('div');
+                        row.className = 'stop-item';
+                        row.innerHTML =
+                            `<span class="pos">${(s.pos*100).toFixed(0)}%</span><input type="range" class="stop-pos" min="0" max="1" step="0.01" value="${s.pos}"><div class="color-preview" style="background: rgb(${s.color.r*255},${s.color.g*255},${s.color.b*255})"></div><button class="delete-stop" ${stops.length<=2?'disabled style="opacity:0.5"':''}>✕</button>`;
+                        const posSlider = row.querySelector('.stop-pos');
+                        const colorPreview = row.querySelector('.color-preview');
+                        const delBtn = row.querySelector('.delete-stop');
+                        posSlider.addEventListener('input', (e) => { let newPos = parseFloat(e.target
+                            .value); if (i === 0 && newPos > 0) newPos = 0; if (i === stops.length -
+                                1 && newPos < 1) newPos = 1;
+                            s.pos = newPos;
+                            stops.sort((a, b) => a.pos - b.pos);
+                            shaderDefs.gradient.updatePass(shader.pass, shader.params); if (
+                                activeModel) rebuildComposerForModel(activeModel);
+                            refreshStops(); });
+                        colorPreview.addEventListener('click', () => { const input = document
+                                .createElement('input');
+                            input.type = 'color';
+                            input.value = new THREE.Color(s.color.r, s.color.g, s.color.b)
+                                .getHexString();
+                            input.addEventListener('input', (e) => { const col = new THREE.Color(e
+                                    .target.value);
+                                s.color = col;
+                                colorPreview.style.backgroundColor =
+                                    `rgb(${col.r*255},${col.g*255},${col.b*255})`;
+                                shaderDefs.gradient.updatePass(shader.pass, shader.params); if (
+                                    activeModel) rebuildComposerForModel(activeModel); });
+                            input.click(); }); if (delBtn && stops.length > 2) { delBtn.onclick = () => { stops
+                                .splice(i, 1);
+                                shaderDefs.gradient.updatePass(shader.pass, shader.params); if (
+                                    activeModel) rebuildComposerForModel(activeModel);
+                                refreshStops(); }; }
+                        stopListDiv.appendChild(row); }
+                    const previewCanvas = document.createElement('canvas');
+                    previewCanvas.width = 200;
+                    previewCanvas.height = 20;
+                    const ctx = previewCanvas.getContext('2d');
+                    const grad = ctx.createLinearGradient(0, 0, 200, 0);
+                    stops.forEach(s => grad.addColorStop(s.pos,
+                        `rgb(${s.color.r*255},${s.color.g*255},${s.color.b*255})`));
+                    ctx.fillStyle = grad;
+                    ctx.fillRect(0, 0, 200, 20);
+                    const existingPreview = stopListDiv.querySelector('.grad-preview'); if (existingPreview)
+                        existingPreview.remove();
+                    const previewDiv = document.createElement('div');
+                    previewDiv.className = 'grad-preview';
+                    previewDiv.style.height = '20px';
+                    previewDiv.style.margin = '8px 0';
+                    previewDiv.style.borderRadius = '4px';
+                    previewDiv.style.background = `url(${previewCanvas.toDataURL()})`;
+                    stopListDiv.appendChild(previewDiv); };
+                refreshStops();
+                content.appendChild(stopListDiv);
+                const addBtn = document.createElement('button');
+                addBtn.textContent = '➕ Add stop (midpoint)';
+                addBtn.className = 'add-stop-btn';
+                addBtn.onclick = () => { let newPos = 0.5; if (stops.length) { const mid = (stops[0].pos + stops[stops
+                            .length - 1].pos) / 2;
+                        newPos = Math.min(0.99, Math.max(0.01, mid)); }
+                    const col = new THREE.Color(0.5, 0.5, 0.5);
+                    stops.push({ pos: newPos, color: col });
+                    stops.sort((a, b) => a.pos - b.pos);
+                    shaderDefs.gradient.updatePass(shader.pass, shader.params); if (activeModel)
+                        rebuildComposerForModel(activeModel);
+                    refreshStops(); };
+                content.appendChild(addBtn);
+                const intensityRow = document.createElement('div');
+                intensityRow.className = 'param-row';
+                intensityRow.innerHTML =
+                    `<label>Intensity (0=original, 1=full gradient)</label><input type="range" id="grad-intensity" min="0" max="1" step="0.01" value="${shader.params.intensity}"><span>${shader.params.intensity}</span>`;
+                const intSlider = intensityRow.querySelector('input');
+                const intSpan = intensityRow.querySelector('span');
+                intSlider.addEventListener('input', (e) => { const val = parseFloat(e.target.value);
+                    shader.params.intensity = val;
+                    intSpan.innerText = val;
+                    shaderDefs.gradient.updatePass(shader.pass, shader.params); if (activeModel)
+                        rebuildComposerForModel(activeModel); });
+                content.appendChild(intensityRow); } else { Object.keys(shader.params).forEach(key => { const row =
+                        document.createElement('div');
+                    row.className = 'param-row';
+                    let label = key.replace(/([A-Z])/g, ' $1').trim();
+                    label = label.charAt(0).toUpperCase() + label.slice(1);
+                    let min = 0,
+                        max = 2,
+                        step = 0.01; if (key === 'colorSteps') { min = 2;
+                        max = 8;
+                        step = 1; } if (key === 'shadowSoftness') { min = 0.5;
+                        max = 2.5;
+                        step = 0.01; } if (key === 'highlightThreshold') { min = 0.3;
+                        max = 1;
+                        step = 0.01; } if (key === 'shadowThreshold') { min = 0;
+                        max = 0.7;
+                        step = 0.01; } if (['exposure', 'contrast', 'brightness'].includes(key)) { min = 0;
+                        max = 2.5;
+                        step = 0.01; } if (key === 'intensity') { min = 0;
+                        max = 1.5;
+                        step = 0.01; }
+                    row.innerHTML =
+                        `<label>${label}</label><input type="range" id="param-${key}" min="${min}" max="${max}" step="${step}" value="${shader.params[key]}"><span>${shader.params[key]}</span>`;
+                    const input = row.querySelector('input');
+                    const span = row.querySelector('span');
+                    input.addEventListener('input', (e) => { const val = parseFloat(e.target.value);
+                        shader.params[key] = val;
+                        span.innerText = val;
+                        shaderDefs[shader.type].updatePass(shader.pass, shader.params); if (
+                            activeModel) rebuildComposerForModel(activeModel); });
+                    content.appendChild(row); }); }
+            panelDiv.style.display = 'block'; }
+        // ============================================================
+        // SECTION END: SHADER_SYSTEM
+        // ============================================================
+
+        // ============================================================
+        // SECTION START: MODEL_LOADER
+        // ============================================================
+        const fileInput = document.getElementById('fileInput');
+        const modelListDiv = document.getElementById('model-list');
+        const binWarning = document.getElementById('bin-warning');
+        const debugPanel = document.getElementById('debug-panel');
+        let debugLogs = [];
+
+        function addDebugLog(msg) { debugLogs.push(`[${new Date().toLocaleTimeString()}] ${msg}`); if (debugPanel.style
+                .display === 'block') { debugPanel.innerText = debugLogs.join('\n');
+                debugPanel.scrollTop = debugPanel.scrollHeight; } }
+        document.getElementById('debug-btn').onclick = () => { if (debugPanel.style.display === 'block') { debugPanel.style
+                    .display = 'none'; } else { debugPanel.innerText = debugLogs.join('\n');
+                debugPanel.style.display = 'block';
+                debugPanel.scrollTop = debugPanel.scrollHeight; if (!debugPanel.querySelector('.copy-debug-btn')) { const
+                        copyBtn = document.createElement('button');
+                    copyBtn.innerText = 'Copy Logs';
+                    copyBtn.className = 'copy-debug-btn';
+                    copyBtn.onclick = () => { navigator.clipboard.writeText(debugLogs.join('\n'));
+                        addDebugLog('📋 Logs copied'); };
+                    debugPanel.appendChild(copyBtn); } } };
+
+        fileInput.addEventListener('change', async (e) => {
+            const files = Array.from(e.target.files);
+            const gltfFiles = files.filter(f => f.name.endsWith('.gltf'));
+            const glbFiles = files.filter(f => f.name.endsWith('.glb'));
+            const binFiles = files.filter(f => f.name.endsWith('.bin'));
+            const imageFiles = files.filter(f => /\.(png|jpg|jpeg|webp|bmp)$/i.test(f.name));
+            addDebugLog(`Loading ${files.length} files`);
+
+            for (const file of files) {
+                const b64 = await readFileAsBase64(file);
+                if (!allUploadedFiles.find(f => f.name === file.name)) {
+                    allUploadedFiles.push({ name: file.name, data: b64, type: file.type || 'application/octet-stream' });
+                }
+            }
+
+            async function processLoadedGltf(gltf, sourceFile) { const model = gltf.scene;
+                model.userData = { id: Date.now() + '-' + Math.random(), name: sourceFile.name, inScene: false, bones: [],
+                    markers: [], fileData: await readFileAsBase64(sourceFile) };
+                let bones = [];
+                model.traverse(c => { if (c.isBone) bones.push(c); });
+                model.traverse(c => { if (c.isSkinnedMesh && c.skeleton) c.skeleton.bones.forEach(b => { if (!bones
+                        .includes(b)) bones.push(b); }); });
+                bones = [...new Map(bones.map(b => [b.id, b])).values()];
+                model.userData.bones = bones;
+                const markers = createBoneMarkers(model, bones);
+                model.userData.markers = markers; if (gltf.animations && gltf.animations.length) { const mixer = new THREE
+                        .AnimationMixer(model);
+                    mixer.clipAction(gltf.animations[0]).play();
+                    mixer.timeScale = 0;
+                    mixerMap.set(model, mixer); }
+                loadedModels.push(model);
+                updateModelListUI();
+                addDebugLog(`Loaded ${sourceFile.name} (${bones.length} bones)`); } for (const glbFile of glbFiles) { const
+                url = URL.createObjectURL(glbFile); try { const loader = new GLTFLoader();
+                const gltf = await new Promise((res, rej) => loader.load(url, res, undefined, rej));
+                URL.revokeObjectURL(url); await processLoadedGltf(gltf, glbFile); } catch (err) { addDebugLog(
+                    `GLB error ${err.message}`); } } for (const gltfFile of gltfFiles) { const resourceBlobUrls = new Map(); for (
+                const binFile of binFiles) { const blob = new Blob([await binFile.arrayBuffer()], { type: 'application/octet-stream' });
+            resourceBlobUrls.set(binFile.name, URL.createObjectURL(blob)); } for (const imgFile of imageFiles) { const blob =
+                new Blob([await imgFile.arrayBuffer()], { type: imgFile.type });
+            resourceBlobUrls.set(imgFile.name, URL.createObjectURL(blob)); } let gltfText = await gltfFile.text();
+            let modifiedGltf = gltfText;
+            const uriRegex = /"uri"\s*:\s*"([^"]+)"/gi;
+            let match; while ((match = uriRegex.exec(gltfText)) !== null) { const originalUri = match[1];
+                const ext = originalUri.split('.').pop().toLowerCase(); if (ext === 'bin' || ['png', 'jpg', 'jpeg', 'webp',
+                    'bmp'
+                ].includes(ext)) { let filename = originalUri.split('/').pop().split('\\').pop();
+                    let blobUrl = null; for (let [storedName, url] of resourceBlobUrls.entries()) { if (storedName ===
+                            filename || storedName.toLowerCase() === filename.toLowerCase()) { blobUrl = url; break; } } if (
+                        blobUrl) modifiedGltf = modifiedGltf.replace(`"${originalUri}"`, `"${blobUrl}"`); else addDebugLog(
+                        `Missing resource ${filename}`); } }
+            const modifiedBlob = new Blob([modifiedGltf], { type: 'application/json' });
+            const modifiedUrl = URL.createObjectURL(modifiedBlob); try { const loader = new GLTFLoader();
+                const gltf = await new Promise((res, rej) => loader.load(modifiedUrl, res, undefined, rej));
+                URL.revokeObjectURL(modifiedUrl); await processLoadedGltf(gltf, gltfFile); } catch (err) { addDebugLog(
+                    `GLTF error ${err.message}`); } for (let url of resourceBlobUrls.values()) URL.revokeObjectURL(
+            url); }
+            fileInput.value = '';
+        });
+
+        function updateModelListUI() { modelListDiv.innerHTML = '';
+            loadedModels.forEach(model => { const div = document.createElement('div');
+                div.className = 'model-item';
+                div.innerHTML =
+                    `<span class="model-name">${model.userData.name.substring(0,20)}</span><span class="model-bones">${model.userData.bones.length}🦴</span><button class="model-btn add">➕ Add</button><button class="model-btn remove">✕ Remove</button>`;
+                div.querySelector('.add').onclick = () => addModelToScene(model);
+                div.querySelector('.remove').onclick = () => removeModelFromScene(model);
+                modelListDiv.appendChild(div); }); }
+
+        const raycaster = new THREE.Raycaster();
+        const clickPos = new THREE.Vector2();
+        window.addEventListener('click', (e) => { if (e.target.closest('#gear-btn') || e.target.closest('#gear-menu') || e
+                .target.closest('#param-panel') || e.target.closest('#mode-buttons') || e.target.closest(
+                    '#panels-menu') || e.target.closest('#gallery-modal') || e.target.closest('#timeline-bar') || e
+                .target.closest('#timeline-context-menu')) return;
+            clickPos.x = (e.clientX / renderer.domElement.clientWidth) * 2 - 1;
+            clickPos.y = -(e.clientY / renderer.domElement.clientHeight) * 2 + 1;
+            raycaster.setFromCamera(clickPos, camera);
+            const allMarkers = [];
+            loadedModels.forEach(m => { if (m.userData.markers) allMarkers.push(...m.userData.markers); });
+            const hits = raycaster.intersectObjects(allMarkers); if (hits.length) { const marker = hits[0].object;
+                const bone = marker.userData.bone;
+                const model = marker.userData.model; if (bone && model && model.userData.inScene) { setActiveModel(
+                    model);
+                    gizmo.detach();
+                    gizmo.attach(bone);
+                    document.getElementById('status').innerHTML = `🦴 ${bone.name || 'bone'}`; } } });
+
+        document.getElementById('add-cel').onclick = () => { if (activeModel) addShaderToModel(activeModel, 'cel'); else document
+                .getElementById('status').innerHTML = '⚠️ Select a model in scene first'; };
+        document.getElementById('add-exposure').onclick = () => { if (activeModel) addShaderToModel(activeModel,
+            'exposure'); else document.getElementById('status').innerHTML = '⚠️ Select a model in scene first'; };
+        document.getElementById('add-greyscale').onclick = () => { if (activeModel) addShaderToModel(activeModel,
+            'greyscale'); else document.getElementById('status').innerHTML = '⚠️ Select a model in scene first'; };
+        document.getElementById('add-gradient').onclick = () => { if (activeModel) addShaderToModel(activeModel,
+            'gradient'); else document.getElementById('status').innerHTML = '⚠️ Select a model in scene first'; };
+        const btnTrans = document.getElementById('btn-translate');
+        const btnRot = document.getElementById('btn-rotate');
+        const btnBones = document.getElementById('btn-bones');
+        btnTrans.onclick = () => { gizmo.setMode('translate');
+            btnTrans.classList.add('active');
+            btnRot.classList.remove('active'); };
+        btnRot.onclick = () => { gizmo.setMode('rotate');
+            btnRot.classList.add('active');
+            btnTrans.classList.remove('active'); };
+        btnBones.onclick = () => { bonesVisible = !bonesVisible;
+            loadedModels.forEach(m => { if (m.userData.markers) m.userData.markers.forEach(marker => marker.visible =
+                    bonesVisible && m.userData.inScene); });
+            btnBones.innerText = bonesVisible ? '👁️ Hide Bones' : '👁️ Show Bones'; };
+        // ============================================================
+        // SECTION END: MODEL_LOADER
+        // ============================================================
+
+        // ============================================================
+// SECTION START: PANEL_SYSTEM
+// ============================================================
+let panels = [];           // local mirror (always holds current panels)
+let currentPanelId = null;
+let FPS = 24;
+
+// Helper to sync panels from Yjs when collaborative
+function syncPanelsFromYjs() {
+    if (isCollaborative && sharedPanels) {
+        panels = sharedPanels.toArray();
+    }
+    renderPanelGrid();      // update UI
+}
+
+// When in collaborative mode, observe changes to sharedPanels
+function setupPanelsObserver() {
+    if (isCollaborative && sharedPanels) {
+        sharedPanels.unobserveAll?.(); // remove previous observer if any
+        sharedPanels.observe(() => {
+            syncPanelsFromYjs();
+            // Also update timeline UI if current panel changed?
+            const currentPanel = getCurrentPanel();
+            if (currentPanel && activePanelForTimeline?.id !== currentPanel.id) {
+                activePanelForTimeline = currentPanel;
+                updateTimelineUIFromPanel(currentPanel);
+                scrubToTime(0);
+            }
+        });
+        syncPanelsFromYjs();
+    }
+}
+
+// Call this when a collaboration session starts (from COLLAB_SYSTEM)
+window.initCollabPanels = function() {
+    setupPanelsObserver();
+};
+
+// Helper to add/update panel in collaborative or local mode
+function updatePanels(newPanelsArray) {
+    if (isCollaborative && sharedPanels) {
+        ydoc.transact(() => {
+            sharedPanels.delete(0, sharedPanels.length);
+            newPanelsArray.forEach(p => sharedPanels.push([p]));
+        });
+    } else {
+        panels = newPanelsArray;
+    }
+    renderPanelGrid();
+}
+
+// Existing functions remain mostly unchanged, but modify panel creation/update to use updatePanels
+function getCurrentSceneState() { 
+    const modelsInScene = loadedModels.filter(m => m.userData.inScene); 
+    return {
+        cameraPos: [camera.position.x, camera.position.y, camera.position.z], 
+        cameraTarget: [orbit.target.x, orbit.target.y, orbit.target.z],
+        models: modelsInScene.map(m => ({ 
+            id: m.userData.id, 
+            name: m.userData.name, 
+            boneData: m.userData.bones.map(bone => ({ 
+                name: bone.name, 
+                position: [bone.position.x, bone.position.y, bone.position.z], 
+                quaternion: [bone.quaternion.x, bone.quaternion.y, bone.quaternion.z, bone.quaternion.w] 
+            })) 
+        }))
+    }; 
+}
+
+function restoreSceneState(state) { 
+    if (!state) return;
+    loadedModels.forEach(m => { if (m.userData.inScene) removeModelFromScene(m); });
+    state.models.forEach(modelState => { 
+        const found = loadedModels.find(m => m.userData.id === modelState.id); 
+        if (found) { 
+            addModelToScene(found);
+            modelState.boneData.forEach(boneState => { 
+                const bone = found.userData.bones.find(b => b.name === boneState.name); 
+                if (bone) { 
+                    bone.position.set(boneState.position[0], boneState.position[1], boneState.position[2]);
+                    bone.quaternion.set(boneState.quaternion[0], boneState.quaternion[1], boneState.quaternion[2], boneState.quaternion[3]); 
+                } 
+            });
+            found.traverse(child => { if (child.isSkinnedMesh && child.skeleton) child.skeleton.update(); }); 
+        } 
+    }); 
+    if (state.cameraPos) { 
+        camera.position.set(state.cameraPos[0], state.cameraPos[1], state.cameraPos[2]);
+        orbit.target.set(state.cameraTarget[0], state.cameraTarget[1], state.cameraTarget[2]);
+        orbit.update(); 
+    }
+    const firstInScene = loadedModels.find(m => m.userData.inScene); 
+    if (firstInScene) setActiveModel(firstInScene); 
+}
+
+function fastCapture() { 
+    composer.render();
+    const canvas = renderer.domElement;
+    const aspect = document.getElementById('capture-aspect').value;
+    const addMargins = document.getElementById('capture-margins').checked;
+    let cropWidth = canvas.width, cropHeight = canvas.height;
+    let targetAspect = null; 
+    if (aspect !== 'screen') { 
+        if (aspect === '16:9') targetAspect = 16 / 9; 
+        else if (aspect === '4:3') targetAspect = 4 / 3; 
+        else if (aspect === '1:1') targetAspect = 1; 
+        else if (aspect === 'b4') targetAspect = 257 / 364; 
+        else if (aspect === 'shonen') targetAspect = 180 / 270; 
+        else if (aspect === 'a4') targetAspect = 210 / 297; 
+        else if (aspect === 'b5') targetAspect = 182 / 257;
+        else if (aspect === 'tankobon') targetAspect = 128 / 182; 
+        if (targetAspect) { 
+            const currentAspect = canvas.width / canvas.height; 
+            if (currentAspect > targetAspect) { 
+                cropWidth = canvas.height * targetAspect;
+                cropHeight = canvas.height; 
+            } else { 
+                cropWidth = canvas.width;
+                cropHeight = canvas.width / targetAspect; 
+            } 
+        } 
+    }
+    const offCanvas = document.createElement('canvas');
+    offCanvas.width = cropWidth;
+    offCanvas.height = cropHeight;
+    const offCtx = offCanvas.getContext('2d');
+    offCtx.drawImage(canvas, (canvas.width - cropWidth) / 2, (canvas.height - cropHeight) / 2, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight); 
+    if (addMargins && aspect !== 'screen') { 
+        const w = cropWidth, h = cropHeight;
+        const basic = w * 0.13, cut = w * 0.05, tank = w * 0.08;
+        offCtx.strokeStyle = '#3399ff';
+        offCtx.strokeRect(basic, basic, w - basic * 2, h - basic * 2);
+        offCtx.strokeStyle = '#ff3333';
+        offCtx.strokeRect(cut, cut, w - cut * 2, h - cut * 2);
+        offCtx.strokeStyle = '#33ff33';
+        offCtx.strokeRect(tank, tank, w - tank * 2, h - tank * 2); 
+    } 
+    return offCanvas.toDataURL('image/png'); 
+}
+
+// Modify createPanel to use collaborative update
+const originalCreatePanel = window.createPanel; // backup if any, but we override
+window.createPanel = function(name) { 
+    const sceneState = getCurrentSceneState(); 
+    if (!sceneState.models.length) { 
+        alert('No models in scene'); 
+        return; 
+    }
+    const screenshot = fastCapture();
+    const autoName = name ? name : `Panel ${panels.length+1}`;
+    const panel = { 
+        id: Date.now(), 
+        name: autoName, 
+        timestamp: new Date().toLocaleString(), 
+        screenshot: screenshot,
+        sceneState: sceneState, 
+        timeline: { duration: 2.0, keyframes: [{ frame: 0, keyframe: sceneState }] } 
+    };
+    const newPanels = [...panels, panel];
+    updatePanels(newPanels);
+    currentPanelId = panel.id;
+    // Also store timeline in sharedTimelines if collaborative
+    if (isCollaborative && sharedTimelines) {
+        ydoc.transact(() => {
+            sharedTimelines.set(panel.id.toString(), panel.timeline);
+        });
+    }
+    document.getElementById('status').innerHTML = `📸 Panel "${panel.name}" created`;
+    activePanelForTimeline = panel;
+    updateTimelineUIFromPanel(panel);
+    scrubToTime(0);
+    document.getElementById('timeline-bar').style.display = 'flex';
+    timelineVisible = true;
+    updateTimelineButtonPosition();
+    selectedKeyframeIndex = -1;
+    document.getElementById('selected-keyframe-status').style.display = 'none';
+};
+
+// Override loadPanel to handle collaborative timelines
+const originalLoadPanel = window.loadPanel;
+window.loadPanel = function(panelId) { 
+    const panel = panels.find(p => p.id === panelId); 
+    if (panel) {
+        restoreSceneState(panel.sceneState);
+        currentPanelId = panel.id;
+        renderPanelGrid();
+        document.getElementById('status').innerHTML = `🖼️ Loaded: ${panel.name}`;
+        activePanelForTimeline = panel;
+        // If collaborative, ensure timeline is up-to-date from sharedTimelines
+        if (isCollaborative && sharedTimelines) {
+            const remoteTimeline = sharedTimelines.get(panel.id.toString());
+            if (remoteTimeline) panel.timeline = remoteTimeline;
+        }
+        updateTimelineUIFromPanel(panel);
+        scrubToTime(0);
+        document.getElementById('timeline-bar').style.display = 'flex';
+        timelineVisible = true;
+        updateTimelineButtonPosition();
+        selectedKeyframeIndex = -1;
+        document.getElementById('selected-keyframe-status').style.display = 'none';
+    } 
+};
+
+// capturePanel, duplicatePanel, deletePanel also need to use updatePanels
+window.capturePanel = function(panelId) { 
+    if (panelId !== currentPanelId) { 
+        document.getElementById('status').innerHTML = `⚠️ Load panel first`; 
+        return; 
+    }
+    const panel = panels.find(p => p.id === panelId); 
+    if (panel) { 
+        panel.screenshot = fastCapture();
+        panel.sceneState = getCurrentSceneState();
+        panel.timestamp = new Date().toLocaleString(); 
+        if (panel.timeline && panel.timeline.keyframes.length && panel.timeline.keyframes[0].frame === 0) 
+            panel.timeline.keyframes[0].keyframe = panel.sceneState;
+        // Update panel in the array
+        const newPanels = panels.map(p => p.id === panelId ? panel : p);
+        updatePanels(newPanels);
+        renderPanelGrid();
+        document.getElementById('status').innerHTML = `📸 Captured ${panel.name}`; 
+    } 
+};
+
+window.duplicatePanel = function(panelId) { 
+    const panel = panels.find(p => p.id === panelId); 
+    if (panel) { 
+        const newPanel = { 
+            id: Date.now(), 
+            name: `${panel.name} (copy)`, 
+            timestamp: new Date().toLocaleString(),
+            screenshot: panel.screenshot, 
+            sceneState: JSON.parse(JSON.stringify(panel.sceneState)),
+            timeline: JSON.parse(JSON.stringify(panel.timeline)) 
+        };
+        const newPanels = [...panels, newPanel];
+        updatePanels(newPanels);
+        if (isCollaborative && sharedTimelines) {
+            ydoc.transact(() => {
+                sharedTimelines.set(newPanel.id.toString(), newPanel.timeline);
+            });
+        }
+        renderPanelGrid();
+        document.getElementById('status').innerHTML = `📋 Duplicated ${newPanel.name}`; 
+    } 
+};
+
+window.deletePanel = function(panelId) { 
+    const newPanels = panels.filter(p => p.id !== panelId); 
+    updatePanels(newPanels);
+    if (currentPanelId === panelId) currentPanelId = null;
+    if (isCollaborative && sharedTimelines) {
+        ydoc.transact(() => {
+            sharedTimelines.delete(panelId.toString());
+        });
+    }
+    document.getElementById('status').innerHTML = `🗑️ Panel deleted`; 
+    if (!getCurrentPanel()) document.getElementById('timeline-bar').style.display = 'none'; 
+};
+
+window.renamePanel = function(panelId, newName) { 
+    const panel = panels.find(p => p.id === panelId); 
+    if (panel && newName && newName.trim()) { 
+        panel.name = newName.trim();
+        const newPanels = panels.map(p => p.id === panelId ? panel : p);
+        updatePanels(newPanels);
+        if (document.getElementById('gallery-modal').style.display === 'flex') renderGallery();
+        document.getElementById('status').innerHTML = `✏️ Renamed to ${panel.name}`; 
+        if (activePanelForTimeline && activePanelForTimeline.id === panelId) 
+            document.getElementById('current-panel-name').innerText = panel.name; 
+    } 
+};
+
+// Keep the original renderPanelGrid (it uses global `panels` which is now synced)
+window.renderPanelGrid = function() { 
+    const gridContainer = document.getElementById('panel-grid');
+    gridContainer.innerHTML = '';
+    panels.forEach(panel => { 
+        const card = document.createElement('div');
+        card.className = `panel-card ${currentPanelId === panel.id ? 'active' : ''}`;
+        card.innerHTML = `
+            <img src="${panel.screenshot}"><div class="panel-name">${panel.name}</div>
+            <div class="panel-actions">
+                <button class="capture-panel">📸 Capture</button>
+                <button class="duplicate-panel">📋 Duplicate</button>
+                <button class="delete-panel">🗑️ Delete</button>
+                <button class="timeline-panel">⏲️ Timeline</button>
+            </div>`;
+        card.addEventListener('click', (e) => { if (e.target.tagName === 'BUTTON') return; loadPanel(panel.id); });
+        card.querySelector('.capture-panel').onclick = (e) => { e.stopPropagation(); capturePanel(panel.id); };
+        card.querySelector('.duplicate-panel').onclick = (e) => { e.stopPropagation(); duplicatePanel(panel.id); };
+        card.querySelector('.delete-panel').onclick = (e) => { e.stopPropagation(); deletePanel(panel.id); };
+        card.querySelector('.timeline-panel').onclick = (e) => { e.stopPropagation(); loadPanel(panel.id); };
+        gridContainer.appendChild(card); 
+    }); 
+};
+
+// Helper to get current panel (used elsewhere)
+window.getCurrentPanel = function() { 
+    return panels.find(p => p.id === currentPanelId); 
+};
+
+// Initial sync (in non-collaborative mode, panels is already [])
+syncPanelsFromYjs();
+// ============================================================
+// SECTION END: PANEL_SYSTEM
+// ============================================================
+
+        // ============================================================
+// SECTION START: TIMELINE_CORE
+// ============================================================
+function captureCurrentKeyframe() { 
+    const modelsInScene = loadedModels.filter(m => m.userData.inScene); 
+    return {
+        cameraPos: [camera.position.x, camera.position.y, camera.position.z], 
+        cameraTarget: [orbit.target.x, orbit.target.y, orbit.target.z],
+        models: modelsInScene.map(m => ({ 
+            id: m.userData.id, 
+            boneData: m.userData.bones.map(bone => ({ 
+                name: bone.name, 
+                position: [bone.position.x, bone.position.y, bone.position.z], 
+                quaternion: [bone.quaternion.x, bone.quaternion.y, bone.quaternion.z, bone.quaternion.w] 
+            })) 
+        }))
+    }; 
+}
+
+function applyKeyframeToScene(keyframe) { 
+    if (!keyframe) return;
+    camera.position.set(keyframe.cameraPos[0], keyframe.cameraPos[1], keyframe.cameraPos[2]);
+    orbit.target.set(keyframe.cameraTarget[0], keyframe.cameraTarget[1], keyframe.cameraTarget[2]);
+    orbit.update();
+    applyKeyframeToSceneForCharacters(keyframe); 
+}
+
+function applyKeyframeToSceneForCharacters(keyframe) { 
+    if (!keyframe || !keyframe.models) return;
+    keyframe.models.forEach(modelKF => { 
+        const model = loadedModels.find(m => m.userData.id === modelKF.id); 
+        if (model && model.userData.inScene) { 
+            modelKF.boneData.forEach(boneKF => { 
+                const bone = model.userData.bones.find(b => b.name === boneKF.name); 
+                if (bone) { 
+                    bone.position.set(boneKF.position[0], boneKF.position[1], boneKF.position[2]);
+                    bone.quaternion.set(boneKF.quaternion[0], boneKF.quaternion[1], boneKF.quaternion[2], boneKF.quaternion[3]); 
+                } 
+            });
+            model.traverse(child => { if (child.isSkinnedMesh && child.skeleton) child.skeleton.update(); }); 
+        } 
+    }); 
+}
+
+function interpolateKeyframesForCharacters(kfA, kfB, t) { 
+    const result = { models: [] }; 
+    for (const modelA of kfA.models) { 
+        const modelB = kfB.models.find(m => m.id === modelA.id); 
+        if (!modelB) continue;
+        const interpModel = { id: modelA.id, boneData: [] }; 
+        for (const boneA of modelA.boneData) { 
+            const boneB = modelB.boneData.find(b => b.name === boneA.name); 
+            if (!boneB) continue;
+            const pos = [
+                boneA.position[0] + (boneB.position[0] - boneA.position[0]) * t, 
+                boneA.position[1] + (boneB.position[1] - boneA.position[1]) * t, 
+                boneA.position[2] + (boneB.position[2] - boneA.position[2]) * t
+            ];
+            const q = new THREE.Quaternion().set(boneA.quaternion[0], boneA.quaternion[1], boneA.quaternion[2], boneA.quaternion[3]);
+            const q2 = new THREE.Quaternion().set(boneB.quaternion[0], boneB.quaternion[1], boneB.quaternion[2], boneB.quaternion[3]);
+            q.slerp(q2, t);
+            interpModel.boneData.push({ name: boneA.name, position: pos, quaternion: [q.x, q.y, q.z, q.w] }); 
+        }
+        result.models.push(interpModel); 
+    } 
+    return result; 
+}
+
+let timelinePlaying = false,
+    timelineStartTime = 0,
+    timelineDuration = 2,
+    currentTimeNormalized = 0;
+let activePanelForTimeline = null;
+let selectedKeyframeIndex = -1;
+let copiedKeyframe = null;
+
+function getCurrentPanel() { return panels.find(p => p.id === currentPanelId); }
+
+// Helper to update timeline in shared map (when collaborative)
+function updateSharedTimeline(panelId, timeline) {
+    if (isCollaborative && sharedTimelines) {
+        ydoc.transact(() => {
+            sharedTimelines.set(panelId.toString(), timeline);
+        });
+    }
+}
+
+// Apply timeline from shared map to local panel (if collaborative and panel exists)
+function syncTimelineFromShared(panelId) {
+    if (isCollaborative && sharedTimelines && panelId) {
+        const remoteTimeline = sharedTimelines.get(panelId.toString());
+        const panel = panels.find(p => p.id === panelId);
+        if (remoteTimeline && panel) {
+            panel.timeline = remoteTimeline;
+            if (activePanelForTimeline && activePanelForTimeline.id === panelId) {
+                activePanelForTimeline.timeline = remoteTimeline;
+            }
+            drawTimelineCanvas();
+        }
+    }
+}
+
+// Observe sharedTimelines changes (to be called after session starts)
+function setupTimelinesObserver() {
+    if (isCollaborative && sharedTimelines) {
+        sharedTimelines.unobserveAll?.();
+        sharedTimelines.observe(() => {
+            if (activePanelForTimeline) {
+                syncTimelineFromShared(activePanelForTimeline.id);
+                updateTimelineUIFromPanel(activePanelForTimeline);
+                scrubToTime(currentTimeNormalized);
+            }
+        });
+    }
+}
+window.initCollabTimelines = setupTimelinesObserver;
+
+function updateTimelineUIFromPanel(panel) { 
+    if (!panel) return;
+    timelineDuration = panel.timeline?.duration || 2;
+    document.getElementById('timeline-duration-input').value = timelineDuration;
+    document.getElementById('fps-input').value = FPS;
+    drawTimelineCanvas();
+    const totalFrames = Math.round(timelineDuration * FPS);
+    document.getElementById('total-time-display').innerText = `${timelineDuration.toFixed(2)}s / ${totalFrames} frames`;
+    document.getElementById('current-panel-name').innerText = panel.name; 
+}
+
+function drawTimelineCanvas() { 
+    const canvas = document.getElementById('timelineCanvas');
+    const container = canvas.parentElement;
+    const width = container.clientWidth - 4;
+    const height = 80;
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#1e1e2e';
+    ctx.fillRect(0, 0, width, height); 
+    if (!activePanelForTimeline) return;
+    const totalFrames = Math.round(activePanelForTimeline.timeline.duration * FPS);
+    const keyframes = activePanelForTimeline.timeline?.keyframes || []; 
+    for (let s = 0; s <= timelineDuration; s += 0.5) { 
+        const x = (s / timelineDuration) * width;
+        ctx.beginPath();
+        ctx.strokeStyle = '#444';
+        ctx.lineWidth = 0.5;
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, height);
+        ctx.stroke();
+        const frameAtSec = Math.round(s * FPS);
+        ctx.fillStyle = '#aaa';
+        ctx.font = '8px monospace';
+        ctx.fillText(`${s}s (f${frameAtSec})`, x + 2, 12); 
+    }
+    for (let i = 0; i < keyframes.length; i++) {
+        const kf = keyframes[i];
+        const kfX = (kf.frame / totalFrames) * width;
+        const holdFrames = kf.holdFrames || 0;
+        const nextFrame = (i < keyframes.length - 1) ? keyframes[i + 1].frame : totalFrames;
+        const maxHold = nextFrame - kf.frame - 1;
+        const actualHold = Math.min(holdFrames, maxHold);
+        if (actualHold > 0) {
+            const barStartX = kfX + 14;
+            const barEndX = ((kf.frame + actualHold) / totalFrames) * width;
+            ctx.fillStyle = 'rgba(255,136,68,0.3)';
+            ctx.fillRect(barStartX, height / 2 - 7, barEndX - barStartX, 14);
+        }
+        if (actualHold > 0) {
+            const handleX = ((kf.frame + actualHold) / totalFrames) * width;
+            ctx.beginPath();
+            ctx.moveTo(handleX, height / 2 - 9);
+            ctx.lineTo(handleX + 14, height / 2);
+            ctx.lineTo(handleX, height / 2 + 9);
+            ctx.closePath();
+            ctx.fillStyle = '#ff8844';
+            ctx.fill();
+        } else {
+            const arrowX = kfX + 12;
+            ctx.beginPath();
+            ctx.moveTo(arrowX, height / 2 - 5);
+            ctx.lineTo(arrowX + 8, height / 2);
+            ctx.lineTo(arrowX, height / 2 + 5);
+            ctx.closePath();
+            ctx.fillStyle = '#ff8844';
+            ctx.fill();
+        }
+        ctx.beginPath();
+        ctx.arc(kfX, height / 2, 9, 0, 2 * Math.PI);
+        ctx.fillStyle = (i === selectedKeyframeIndex) ? '#ffaa44' : '#ff8844';
+        if (i === selectedKeyframeIndex) ctx.shadowBlur = 6;
+        else ctx.shadowBlur = 0;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 9px monospace';
+        let label = `F${kf.frame}`;
+        if (actualHold > 0) label += `+${actualHold}`;
+        if (kf.interpolation === 'step') label += '■';
+        ctx.fillText(label, kfX - 10, height / 2 - 8);
+    }
+    const currentFrame = Math.round(currentTimeNormalized * totalFrames);
+    const playheadX = (currentFrame / totalFrames) * width;
+    ctx.beginPath();
+    ctx.strokeStyle = '#88ff88';
+    ctx.lineWidth = 2;
+    ctx.moveTo(playheadX, 0);
+    ctx.lineTo(playheadX, height);
+    ctx.stroke();
+    ctx.fillStyle = '#88ff88';
+    ctx.fillRect(playheadX - 2, 0, 4, 10);
+    const bar = document.getElementById('timeline-bar');
+    if (selectedKeyframeIndex !== -1 && !bar.classList.contains('collapsed')) {
+        bar.classList.add('selected-shift');
+    } else {
+        bar.classList.remove('selected-shift');
+    }
+}
+
+function scrubToTime(normalized) { 
+    if (!activePanelForTimeline) return;
+    const totalFrames = Math.round(activePanelForTimeline.timeline.duration * FPS);
+    const currentFrame = Math.min(totalFrames, Math.max(0, Math.round(normalized * totalFrames)));
+    const keyframes = activePanelForTimeline.timeline?.keyframes || []; 
+    if (keyframes.length === 0) return;
+    keyframes.sort((a, b) => a.frame - b.frame);
+    let kfIndex = 0; 
+    for (let i = keyframes.length - 1; i >= 0; i--) { 
+        if (currentFrame >= keyframes[i].frame) {
+            kfIndex = i; break; 
+        } 
+    }
+    const kf = keyframes[kfIndex];
+    const nextKf = (kfIndex < keyframes.length - 1) ? keyframes[kfIndex + 1] : null; 
+    if (nextKf) { 
+        const range = nextKf.frame - kf.frame;
+        const localT = range === 0 ? 0 : (currentFrame - kf.frame) / range;
+        camera.position.lerpVectors(new THREE.Vector3(...kf.keyframe.cameraPos), new THREE.Vector3(...nextKf.keyframe.cameraPos), localT);
+        orbit.target.lerpVectors(new THREE.Vector3(...kf.keyframe.cameraTarget), new THREE.Vector3(...nextKf.keyframe.cameraTarget), localT);
+        orbit.update(); 
+    } else { 
+        camera.position.set(...kf.keyframe.cameraPos);
+        orbit.target.set(...kf.keyframe.cameraTarget);
+        orbit.update(); 
+    }
+    const hold = kf.holdFrames || 0;
+    const effectiveCharStart = kf.frame + hold; 
+    if (hold > 0 && currentFrame <= effectiveCharStart) {
+        applyKeyframeToSceneForCharacters(kf.keyframe); 
+    } else if (nextKf && currentFrame >= effectiveCharStart && currentFrame <= nextKf.frame) { 
+        const range = nextKf.frame - effectiveCharStart;
+        const localT = range === 0 ? 0 : (currentFrame - effectiveCharStart) / range; 
+        if (kf.interpolation === 'step') { 
+            applyKeyframeToSceneForCharacters(kf.keyframe); 
+        } else { 
+            const interpChar = interpolateKeyframesForCharacters(kf.keyframe, nextKf.keyframe, localT);
+            applyKeyframeToSceneForCharacters(interpChar); 
+        } 
+    } else { 
+        if (currentFrame <= keyframes[0].frame) {
+            applyKeyframeToSceneForCharacters(keyframes[0].keyframe); 
+        } else { 
+            applyKeyframeToSceneForCharacters(keyframes[keyframes.length - 1].keyframe); 
+        } 
+    }
+    const timeInSeconds = currentFrame / FPS;
+    document.getElementById('current-time-display').innerText = `${timeInSeconds.toFixed(2)}s (f${currentFrame}/${totalFrames})`;
+    currentTimeNormalized = normalized;
+    drawTimelineCanvas(); 
+}
+
+// --- MUTATION WRAPPERS (broadcast via Yjs if collaborative) ---
+function addKeyframeAtTime(normalizedTime) { 
+    if (!activePanelForTimeline) return;
+    normalizedTime = Math.min(1, Math.max(0, normalizedTime));
+    const snap = document.getElementById('timeline-snap').checked; 
+    if (snap) normalizedTime = Math.round(normalizedTime * 10) / 10;
+    const totalFrames = Math.round(activePanelForTimeline.timeline.duration * FPS);
+    const frameNumber = Math.round(normalizedTime * totalFrames);
+    const newKeyframe = captureCurrentKeyframe(); 
+    if (!activePanelForTimeline.timeline) activePanelForTimeline.timeline = { duration: 2, keyframes: [] };
+    activePanelForTimeline.timeline.keyframes.push({ frame: frameNumber, keyframe: newKeyframe });
+    activePanelForTimeline.timeline.keyframes.sort((a, b) => a.frame - b.frame); 
+    
+    // Sync to shared map if collaborative
+    if (isCollaborative && sharedTimelines) {
+        updateSharedTimeline(activePanelForTimeline.id, activePanelForTimeline.timeline);
+    } else {
+        // Local only: update panel in panels array
+        const panelTarget = panels.find(p => p.id === activePanelForTimeline.id);
+        if (panelTarget) panelTarget.timeline = activePanelForTimeline.timeline;
+    }
+    drawTimelineCanvas();
+    document.getElementById('status').innerHTML = `Keyframe added at frame ${frameNumber}`; 
+}
+
+function updateSelectedKeyframe() { 
+    if (!activePanelForTimeline || selectedKeyframeIndex === -1) return;
+    const kfs = activePanelForTimeline.timeline.keyframes; 
+    if (selectedKeyframeIndex >= 0 && selectedKeyframeIndex < kfs.length) { 
+        kfs[selectedKeyframeIndex].keyframe = captureCurrentKeyframe(); 
+        if (isCollaborative && sharedTimelines) {
+            updateSharedTimeline(activePanelForTimeline.id, activePanelForTimeline.timeline);
+        } else {
+            const panelTarget = panels.find(p => p.id === activePanelForTimeline.id);
+            if (panelTarget) panelTarget.timeline = activePanelForTimeline.timeline;
+        }
+        drawTimelineCanvas();
+        document.getElementById('status').innerHTML = `Keyframe ${selectedKeyframeIndex} updated`;
+        scrubToTime(currentTimeNormalized); 
+    } 
+}
+
+function deleteSelectedKeyframe() { 
+    if (!activePanelForTimeline || selectedKeyframeIndex === -1) return;
+    const kfs = activePanelForTimeline.timeline.keyframes; 
+    if (selectedKeyframeIndex >= 0 && selectedKeyframeIndex < kfs.length) { 
+        kfs.splice(selectedKeyframeIndex, 1);
+        selectedKeyframeIndex = -1;
+        document.getElementById('selected-keyframe-status').style.display = 'none'; 
+        if (isCollaborative && sharedTimelines) {
+            updateSharedTimeline(activePanelForTimeline.id, activePanelForTimeline.timeline);
+        } else {
+            const panelTarget = panels.find(p => p.id === activePanelForTimeline.id);
+            if (panelTarget) panelTarget.timeline = activePanelForTimeline.timeline;
+        }
+        drawTimelineCanvas();
+        document.getElementById('status').innerHTML = 'Keyframe deleted'; 
+    } 
+}
+
+function copySelectedKeyframe() { 
+    if (!activePanelForTimeline || selectedKeyframeIndex === -1) return;
+    const kfs = activePanelForTimeline.timeline.keyframes; 
+    if (selectedKeyframeIndex >= 0 && selectedKeyframeIndex < kfs.length) { 
+        copiedKeyframe = JSON.parse(JSON.stringify({ 
+            keyframe: kfs[selectedKeyframeIndex].keyframe,
+            holdFrames: kfs[selectedKeyframeIndex].holdFrames, 
+            frameNumber: kfs[selectedKeyframeIndex].frameNumber, 
+            interpolation: kfs[selectedKeyframeIndex].interpolation 
+        }));
+        document.getElementById('status').innerHTML = 'Keyframe copied'; 
+    } 
+}
+
+function pasteKeyframeAtCurrentTime() { 
+    if (!activePanelForTimeline || !copiedKeyframe) return;
+    const snap = document.getElementById('timeline-snap').checked;
+    let pasteTime = currentTimeNormalized; 
+    if (snap) pasteTime = Math.round(pasteTime * 10) / 10;
+    const totalFrames = Math.round(activePanelForTimeline.timeline.duration * FPS);
+    const pasteFrame = Math.round(pasteTime * totalFrames); 
+    if (!activePanelForTimeline.timeline) activePanelForTimeline.timeline = { duration: 2, keyframes: [] };
+    activePanelForTimeline.timeline.keyframes.push({ 
+        frame: pasteFrame, 
+        keyframe: JSON.parse(JSON.stringify(copiedKeyframe.keyframe)), 
+        holdFrames: copiedKeyframe.holdFrames, 
+        frameNumber: copiedKeyframe.frameNumber, 
+        interpolation: copiedKeyframe.interpolation 
+    });
+    activePanelForTimeline.timeline.keyframes.sort((a, b) => a.frame - b.frame); 
+    if (isCollaborative && sharedTimelines) {
+        updateSharedTimeline(activePanelForTimeline.id, activePanelForTimeline.timeline);
+    } else {
+        const panelTarget = panels.find(p => p.id === activePanelForTimeline.id);
+        if (panelTarget) panelTarget.timeline = activePanelForTimeline.timeline;
+    }
+    drawTimelineCanvas();
+    document.getElementById('status').innerHTML = `Keyframe pasted at frame ${pasteFrame}`; 
+}
+
+function setKeyframeFrameNumber() { 
+    if (!activePanelForTimeline || selectedKeyframeIndex === -1) return;
+    const val = prompt('Enter frame number:', activePanelForTimeline.timeline.keyframes[selectedKeyframeIndex].frameNumber || '0'); 
+    if (val !== null) { 
+        activePanelForTimeline.timeline.keyframes[selectedKeyframeIndex].frameNumber = parseInt(val) || 0; 
+        if (isCollaborative && sharedTimelines) {
+            updateSharedTimeline(activePanelForTimeline.id, activePanelForTimeline.timeline);
+        } else {
+            const panelTarget = panels.find(p => p.id === activePanelForTimeline.id);
+            if (panelTarget) panelTarget.timeline = activePanelForTimeline.timeline;
+        }
+        drawTimelineCanvas();
+        document.getElementById('status').innerHTML = `Frame number set to ${val}`; 
+    } 
+}
+
+function setKeyframeHoldFrames() { 
+    if (!activePanelForTimeline || selectedKeyframeIndex === -1) return;
+    const val = prompt('Enter hold frames (0 for no hold):', activePanelForTimeline.timeline.keyframes[selectedKeyframeIndex].holdFrames || '0'); 
+    if (val !== null) { 
+        activePanelForTimeline.timeline.keyframes[selectedKeyframeIndex].holdFrames = parseInt(val) || 0; 
+        if (isCollaborative && sharedTimelines) {
+            updateSharedTimeline(activePanelForTimeline.id, activePanelForTimeline.timeline);
+        } else {
+            const panelTarget = panels.find(p => p.id === activePanelForTimeline.id);
+            if (panelTarget) panelTarget.timeline = activePanelForTimeline.timeline;
+        }
+        drawTimelineCanvas();
+        document.getElementById('status').innerHTML = `Hold frames set to ${val}`; 
+    } 
+}
+
+function toggleKeyframeInterpolation() { 
+    if (!activePanelForTimeline || selectedKeyframeIndex === -1) return;
+    const current = activePanelForTimeline.timeline.keyframes[selectedKeyframeIndex].interpolation;
+    const newVal = current === 'step' ? 'linear' : 'step';
+    activePanelForTimeline.timeline.keyframes[selectedKeyframeIndex].interpolation = newVal; 
+    if (isCollaborative && sharedTimelines) {
+        updateSharedTimeline(activePanelForTimeline.id, activePanelForTimeline.timeline);
+    } else {
+        const panelTarget = panels.find(p => p.id === activePanelForTimeline.id);
+        if (panelTarget) panelTarget.timeline = activePanelForTimeline.timeline;
+    }
+    drawTimelineCanvas();
+    document.getElementById('status').innerHTML = `Interpolation: ${newVal}`; 
+}
+
+function startTimelinePlayback() { 
+    if (!activePanelForTimeline) return;
+    timelineDuration = activePanelForTimeline.timeline?.duration || 2;
+    timelinePlaying = true;
+    timelineStartTime = performance.now() / 1000 - currentTimeNormalized * timelineDuration;
+
+    function playLoop() { 
+        if (!timelinePlaying) return;
+        const now = performance.now() / 1000;
+        let elapsed = now - timelineStartTime; 
+        if (elapsed >= timelineDuration) { 
+            elapsed = timelineDuration;
+            timelinePlaying = false;
+            document.getElementById('timeline-play-btn').innerHTML = '▶️ Play'; 
+        }
+        const t = elapsed / timelineDuration;
+        scrubToTime(t); 
+        if (timelinePlaying) requestAnimationFrame(playLoop); 
+    }
+    requestAnimationFrame(playLoop); 
+}
+
+// Expose sync function for external use (e.g., after loading a panel)
+window.syncTimelineFromShared = syncTimelineFromShared;
+
+// ============================================================
+// SECTION END: TIMELINE_CORE
+// ============================================================
+
+        // ============================================================
+        // SECTION START: PANEL_MANAGEMENT_AND_GALLERY
+        // ============================================================
+        function createPanel(name) { const sceneState = getCurrentSceneState(); if (!sceneState.models.length) { alert(
+                    'No models in scene'); return; }
+            const screenshot = fastCapture();
+            const autoName = name ? name : `Panel ${panels.length+1}`;
+            const panel = { id: Date.now(), name: autoName, timestamp: new Date().toLocaleString(), screenshot: screenshot,
+                sceneState: sceneState, timeline: { duration: 2.0, keyframes: [{ frame: 0, keyframe: sceneState }] } };
+            panels.push(panel);
+            currentPanelId = panel.id;
+            renderPanelGrid();
+            document.getElementById('status').innerHTML = `📸 Panel "${panel.name}" created`;
+            activePanelForTimeline = panel;
+            updateTimelineUIFromPanel(panel);
+            scrubToTime(0);
+            document.getElementById('timeline-bar').style.display = 'flex';
+            timelineVisible = true;
+            updateTimelineButtonPosition();
+            selectedKeyframeIndex = -1;
+            document.getElementById('selected-keyframe-status').style.display = 'none'; }
+
+        function loadPanel(panelId) { const panel = panels.find(p => p.id === panelId); if (panel) {
+            restoreSceneState(panel.sceneState);
+                currentPanelId = panel.id;
+                renderPanelGrid();
+                document.getElementById('status').innerHTML = `🖼️ Loaded: ${panel.name}`;
+                activePanelForTimeline = panel;
+                updateTimelineUIFromPanel(panel);
+                scrubToTime(0);
+                document.getElementById('timeline-bar').style.display = 'flex';
+                timelineVisible = true;
+                updateTimelineButtonPosition();
+                selectedKeyframeIndex = -1;
+                document.getElementById('selected-keyframe-status').style.display = 'none'; } }
+
+        function capturePanel(panelId) { if (panelId !== currentPanelId) { document.getElementById('status').innerHTML =
+                `⚠️ Load panel first`; return; }
+            const panel = panels.find(p => p.id === panelId); if (panel) { panel.screenshot = fastCapture();
+                panel.sceneState = getCurrentSceneState();
+                panel.timestamp = new Date().toLocaleString(); if (panel.timeline && panel.timeline.keyframes.length &&
+                    panel.timeline.keyframes[0].frame === 0) panel.timeline.keyframes[0].keyframe = panel.sceneState;
+                renderPanelGrid();
+                document.getElementById('status').innerHTML = `📸 Captured ${panel.name}`; } }
+
+        function duplicatePanel(panelId) { const panel = panels.find(p => p.id === panelId); if (panel) { const newPanel = {
+                    id: Date.now(), name: `${panel.name} (copy)`, timestamp: new Date().toLocaleString(),
+                    screenshot: panel.screenshot, sceneState: JSON.parse(JSON.stringify(panel.sceneState)),
+                    timeline: JSON.parse(JSON.stringify(panel.timeline)) };
+                panels.push(newPanel);
+                renderPanelGrid();
+                document.getElementById('status').innerHTML = `📋 Duplicated ${newPanel.name}`; } }
+
+        function deletePanel(panelId) { panels = panels.filter(p => p.id !== panelId); if (currentPanelId === panelId)
+                currentPanelId = null;
+            renderPanelGrid();
+            document.getElementById('status').innerHTML = `🗑️ Panel deleted`; if (!getCurrentPanel()) document.getElementById(
+                'timeline-bar').style.display = 'none'; }
+
+        function renamePanel(panelId, newName) { const panel = panels.find(p => p.id === panelId); if (panel && newName &&
+                newName.trim()) { panel.name = newName.trim();
+                renderPanelGrid(); if (document.getElementById('gallery-modal').style.display === 'flex') renderGallery();
+                document.getElementById('status').innerHTML = `✏️ Renamed to ${panel.name}`; if (activePanelForTimeline &&
+                    activePanelForTimeline.id === panelId) document.getElementById('current-panel-name').innerText = panel
+                    .name; } }
+
+        function renderPanelGrid() { const gridContainer = document.getElementById('panel-grid');
+            gridContainer.innerHTML = '';
+            panels.forEach(panel => { const card = document.createElement('div');
+                card.className = `panel-card ${currentPanelId === panel.id ? 'active' : ''}`;
+                card.innerHTML =
+                    `<img src="${panel.screenshot}"><div class="panel-name">${panel.name}</div><div class="panel-actions"><button class="capture-panel">📸 Capture</button><button class="duplicate-panel">📋 Duplicate</button><button class="delete-panel">🗑️ Delete</button><button class="timeline-panel">⏲️ Timeline</button></div>`;
+                card.addEventListener('click', (e) => { if (e.target.tagName === 'BUTTON') return;
+                    loadPanel(panel.id); });
+                card.querySelector('.capture-panel').onclick = (e) => { e.stopPropagation();
+                    capturePanel(panel.id); };
+                card.querySelector('.duplicate-panel').onclick = (e) => { e.stopPropagation();
+                    duplicatePanel(panel.id); };
+                card.querySelector('.delete-panel').onclick = (e) => { e.stopPropagation();
+                    deletePanel(panel.id); };
+                card.querySelector('.timeline-panel').onclick = (e) => { e.stopPropagation();
+                    loadPanel(panel.id); };
+                gridContainer.appendChild(card); }); }
+
+        // Panel Grid Zoom
+        let currentZoom = 0;
+        const panelGridEl = document.getElementById('panel-grid');
+        document.getElementById('zoom-in').onclick = () => { currentZoom = Math.min(currentZoom + 0.2, 2);
+            panelGridEl.style.transform = `scale(${1+currentZoom})`;
+            panelGridEl.style.transformOrigin = 'top left'; };
+        document.getElementById('zoom-out').onclick = () => { currentZoom = Math.max(currentZoom - 0.2, -0.4);
+            panelGridEl.style.transform = `scale(${1+currentZoom})`;
+            panelGridEl.style.transformOrigin = 'top left'; };
+        document.getElementById('zoom-reset').onclick = () => { currentZoom = 0;
+            panelGridEl.style.transform = 'scale(1)'; };
+
+        // ========== GALLERY ==========
+        function renderGallery() { const scrollDiv = document.getElementById('gallery-scroll');
+            scrollDiv.innerHTML = '';
+            panels.forEach((panel, idx) => { const div = document.createElement('div');
+                div.className = 'gallery-item';
+                div.draggable = true;
+                div.setAttribute('data-idx', idx);
+                div.innerHTML =
+                    `<img src="${panel.screenshot}"><div class="gallery-item-info"><div class="name">${panel.name}</div><div class="timestamp">${panel.timestamp}</div></div><div class="gallery-actions"><button class="move-up">▲ Up</button><button class="move-down">▼ Down</button><button class="export-image-gallery">🖼️ Export as Image</button><button class="export-animation-gallery">🎬 Export Animation</button><button class="rename-gallery">✏️ Rename</button><button class="delete-gallery">🗑️ Delete</button></div>`;
+                div.querySelector('.move-up').onclick = () => movePanel(idx, idx - 1);
+                div.querySelector('.move-down').onclick = () => movePanel(idx, idx + 1);
+                div.querySelector('.export-image-gallery').onclick = () => exportSinglePanelAsImage(panel);
+                div.querySelector('.export-animation-gallery').onclick = () => exportPanelAnimation(panel);
+                div.querySelector('.rename-gallery').onclick = () => { const newName = prompt('New panel name:',
+                    panel.name); if (newName && newName.trim()) renamePanel(panel.id, newName);
+                    renderGallery();
+                    renderPanelGrid(); };
+                div.querySelector('.delete-gallery').onclick = () => { deletePanel(panel.id);
+                    renderGallery();
+                    renderPanelGrid(); };
+                div.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/plain', idx);
+                    div.classList.add('dragging'); });
+                div.addEventListener('dragend', () => div.classList.remove('dragging'));
+                div.addEventListener('dragover', (e) => e.preventDefault());
+                div.addEventListener('drop', (e) => { e.preventDefault();
+                    const fromIdx = parseInt(e.dataTransfer.getData('text/plain')); if (fromIdx !== idx) movePanel(
+                        fromIdx, idx); });
+                scrollDiv.appendChild(div); }); }
+
+        function movePanel(from, to) { if (to < 0 || to >= panels.length) return;
+            const [removed] = panels.splice(from, 1);
+            panels.splice(to, 0, removed);
+            panels.forEach((p, i) => p.name = `Panel ${i+1}`);
+            renderGallery();
+            renderPanelGrid();
+            document.getElementById('status').innerHTML = `🔄 Reordered panels`; }
+        // ============================================================
+        // SECTION END: PANEL_MANAGEMENT_AND_GALLERY
+        // ============================================================
+
+                // ============================================================
+        // SECTION START: EXPORT_FUNCTIONS
+        // ============================================================
+        async function exportSinglePanelAsImage(panel) { document.getElementById('status').innerHTML =
+                `🎨 Rendering ${panel.name} ...`;
+            const useJPEG = document.getElementById('use-jpeg').checked;
+            const dataURL = await renderHighQualityCapture(panel.sceneState, useJPEG ? 'jpeg' : 'png', 0.92);
+            const a = document.createElement('a');
+            a.download = `${panel.name.replace(/\s/g,'_')}.${useJPEG?'jpg':'png'}`;
+            a.href = dataURL;
+            a.click();
+            document.getElementById('status').innerHTML = `✅ Exported ${panel.name}`; }
+
+        async function exportPanelAnimation(panel) { if (!panel.timeline || !panel.timeline.keyframes.length) { alert(
+                    'No keyframes in this panel'); return; }
+            document.getElementById('status').innerHTML = `🎬 Exporting keyframes for ${panel.name}...`;
+            const keyframes = panel.timeline.keyframes.sort((a, b) => a.frame - b.frame);
+            const zip = new JSZip();
+            let timingLines = [`# Timing for "${panel.name}"`, `# FPS: ${FPS}`]; for (let i = 0; i < keyframes.length; i++) {
+                const kf = keyframes[i];
+                const hold = kf.holdFrames || 0;
+                const dataURL = await renderHighQualityCapture(kf.keyframe, 'png', 1.0);
+                const img = await loadImage(dataURL);
+                const stampedCanvas = document.createElement('canvas');
+                const stampHeight = 40;
+                stampedCanvas.width = img.width;
+                stampedCanvas.height = img.height + stampHeight;
+                const ctx = stampedCanvas.getContext('2d');
+                ctx.fillStyle = '#1a1a2e';
+                ctx.fillRect(0, img.height, stampedCanvas.width, stampHeight);
+                ctx.drawImage(img, 0, 0);
+                ctx.fillStyle = '#ff8844';
+                ctx.font = '20px monospace';
+                ctx.fillText(`${panel.name} | F${kf.frame} | Hold:${hold} | ${(kf.frame/FPS).toFixed(2)}s`, 20, img.height +
+                    28);
+                const stampedDataURL = stampedCanvas.toDataURL('image/png');
+                const base64 = stampedDataURL.split(',')[1];
+                const holdStr = hold > 0 ? `_hold${hold}` : '';
+                zip.file(`F${kf.frame}${holdStr}.png`, base64, { base64: true });
+                timingLines.push(`frame ${kf.frame}: hold ${hold} frames`); }
+            zip.file('_timing.txt', timingLines.join('\n'));
+            const blob = await zip.generateAsync({ type: 'blob' });
+            const a = document.createElement('a');
+            a.download = `${panel.name}_keyframes.zip`;
+            a.href = URL.createObjectURL(blob);
+            a.click();
+            URL.revokeObjectURL(a.href);
+            document.getElementById('status').innerHTML = `✅ Exported ${panel.name} keyframes with timing`; }
+
+        function loadImage(dataURL) { return new Promise((resolve) => { const img = new Image();
+                img.onload = () => resolve(img);
+                img.src = dataURL; }); }
+
+        async function exportAllPanelsAsPDF() { const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pageWidth = 210,
+                pageHeight = 297;
+            let y = 20;
+            const useJPEG = document.getElementById('use-jpeg').checked;
+            const progressDiv = document.getElementById('progress-container');
+            progressDiv.style.display = 'block'; for (let i = 0; i < panels.length; i++) { const panel = panels[i];
+                progressDiv.innerHTML =
+                    `<span class="loading-spinner"></span> Rendering panel ${i+1}/${panels.length}: ${panel.name}`;
+                const highRes = await renderHighQualityCapture(panel.sceneState, useJPEG ? 'jpeg' : 'png', 0.92);
+                const img = new Image(); await new Promise(resolve => { img.onload = resolve;
+                    img.src = highRes; });
+                const imgAspect = img.width / img.height;
+                let drawWidth = 170;
+                let drawHeight = 170 / imgAspect; if (drawHeight > 250) { drawHeight = 250;
+                    drawWidth = 250 * imgAspect; }
+                const x = (pageWidth - drawWidth) / 2; if (i > 0 && y + drawHeight + 15 > pageHeight - 20) { pdf.addPage();
+                    y = 20; }
+                pdf.setFontSize(11);
+                pdf.text(panel.name, x, y - 4);
+                pdf.addImage(highRes, useJPEG ? 'JPEG' : 'PNG', x, y, drawWidth, drawHeight);
+                y += drawHeight + 15; }
+            pdf.save('storyboard_export.pdf');
+            progressDiv.style.display = 'none';
+            document.getElementById('status').innerHTML = `📄 PDF export complete (${panels.length} panels)`; }
+
+        let sharedOffRenderer = null,
+            sharedOffComposer = null;
+        async function initSharedOffscreen(w, h) {
+            // Re-create renderer if dimensions changed
+            if (sharedOffRenderer && (sharedOffRenderer.domElement.width !== w || sharedOffRenderer.domElement.height !== h)) {
+                sharedOffRenderer.dispose();
+                sharedOffRenderer = null;
+                sharedOffComposer = null;
+            }
+            // Create new renderer if needed
+            if (!sharedOffRenderer) {
+                sharedOffRenderer = new THREE.WebGLRenderer({ preserveDrawingBuffer: true });
+                sharedOffRenderer.setSize(w, h);
+                sharedOffRenderer.shadowMap.enabled = true;
+            }
+            // ALWAYS rebuild the composer from scratch to capture current shaders
+            // Dispose old composer if exists
+            if (sharedOffComposer) {
+                // Clean up any existing passes (optional, helps memory)
+                while (sharedOffComposer.passes.length) {
+                    const pass = sharedOffComposer.passes.pop();
+                    if (pass.dispose) pass.dispose();
+                }
+                sharedOffComposer = null;
+            }
+            // Create fresh composer with current globalShaders
+            sharedOffComposer = new EffectComposer(sharedOffRenderer);
+            sharedOffComposer.addPass(new RenderPass(scene, camera));
+            // Add each global shader as a fresh pass
+            globalShaders.forEach(shader => {
+                if (shader.pass) {
+                    const def = shaderDefs[shader.type];
+                    if (def) {
+                        const freshPass = def.createPass();
+                        def.updatePass(freshPass, shader.params);
+                        sharedOffComposer.addPass(freshPass);
+                        freshPass.renderToScreen = false;
+                    }
+                }
+            });
+            if (sharedOffComposer.passes.length) {
+                sharedOffComposer.passes[sharedOffComposer.passes.length - 1].renderToScreen = true;
+            }
+            return { renderer: sharedOffRenderer, composer: sharedOffComposer };
+        }
+
+        async function renderHighQualityCapture(sceneState, format = 'jpeg', quality = 0.92) { const oldActive =
+            activeModel;
+            const oldCamPos = camera.position.clone();
+            const oldTarget = orbit.target.clone();
+            const oldInScene = loadedModels.filter(m => m.userData.inScene);
+            restoreSceneState(sceneState);
+            const aspect = document.getElementById('capture-aspect').value;
+            const addMargins = document.getElementById('capture-margins').checked;
+            let targetWidth = 1920,
+                targetHeight = 1920; if (aspect === '16:9') targetHeight = 1080; else if (aspect === '4:3')
+                targetHeight = 1440; else if (aspect === '1:1') targetHeight = 1920; else if (aspect === 'b4')
+                targetHeight = Math.round(1920 / (257 / 364)); else if (aspect === 'shonen') targetHeight = Math.round(
+                    1920 / (180 / 270)); else if (aspect === 'a4') targetHeight = Math.round(1920 / (210 / 297));
+            else if (aspect === 'b5') targetHeight = Math.round(1920 / (182 / 257)); else if (aspect === 'tankobon')
+                targetHeight = Math.round(1920 / (128 / 182));
+            const { renderer: offRenderer, composer: offComposer } = await initSharedOffscreen(targetWidth, targetHeight);
+            const offCamera = new THREE.PerspectiveCamera(camera.fov, targetWidth / targetHeight, camera.near, camera.far);
+            offCamera.position.copy(camera.position);
+            offCamera.lookAt(orbit.target);
+            offComposer.passes[0].camera = offCamera;
+            offComposer.render();
+            const canvas = offRenderer.domElement;
+            let cropWidth = canvas.width,
+                cropHeight = canvas.height;
+            let targetAspect = null; if (aspect !== 'screen') { if (aspect === '16:9') targetAspect = 16 / 9; else if (aspect ===
+                    '4:3') targetAspect = 4 / 3; else if (aspect === '1:1') targetAspect = 1; else if (aspect ===
+                'b4') targetAspect = 257 / 364; else if (aspect === 'shonen') targetAspect = 180 / 270; else if (
+                aspect === 'a4') targetAspect = 210 / 297; else if (aspect === 'b5') targetAspect = 182 / 257;
+            else if (aspect === 'tankobon') targetAspect = 128 / 182; if (targetAspect) { const currAspect = canvas
+                    .width / canvas.height; if (currAspect > targetAspect) { cropWidth = canvas.height *
+                    targetAspect;
+                    cropHeight = canvas.height; } else { cropWidth = canvas.width;
+                    cropHeight = canvas.width / targetAspect; } } }
+            const finalCanvas = document.createElement('canvas');
+            finalCanvas.width = cropWidth;
+            finalCanvas.height = cropHeight;
+            const ctx = finalCanvas.getContext('2d');
+            ctx.drawImage(canvas, (canvas.width - cropWidth) / 2, (canvas.height - cropHeight) / 2, cropWidth, cropHeight, 0,
+                0, cropWidth, cropHeight); if (addMargins && aspect !== 'screen') { const w = cropWidth,
+                    h = cropHeight;
+                const basic = w * 0.13,
+                    cut = w * 0.05,
+                    tank = w * 0.08;
+                ctx.strokeStyle = '#3399ff';
+                ctx.strokeRect(basic, basic, w - basic * 2, h - basic * 2);
+                ctx.strokeStyle = '#ff3333';
+                ctx.strokeRect(cut, cut, w - cut * 2, h - cut * 2);
+                ctx.strokeStyle = '#33ff33';
+                ctx.strokeRect(tank, tank, w - tank * 2, h - tank * 2); }
+            let dataURL; if (format === 'jpeg') dataURL = finalCanvas.toDataURL('image/jpeg', quality); else dataURL =
+                finalCanvas.toDataURL('image/png');
+            loadedModels.forEach(m => { if (m.userData.inScene) removeModelFromScene(m); });
+            oldInScene.forEach(m => addModelToScene(m));
+            camera.position.copy(oldCamPos);
+            orbit.target.copy(oldTarget);
+            orbit.update(); if (oldActive) setActiveModel(oldActive); return dataURL; }
+
+        function getLetter(index) { let result = ''; while (index >= 0) { result = String.fromCharCode(65 + (index % 26)) +
+                result;
+                index = Math.floor(index / 26) - 1; } return result; }
+
+        function getFrameState(panel, frameNumber) { const totalFrames = Math.round(panel.timeline.duration * FPS);
+            const currentFrame = Math.min(totalFrames, Math.max(0, frameNumber));
+            const keyframes = panel.timeline.keyframes.slice().sort((a, b) => a.frame - b.frame);
+            let kfIndex = 0; for (let i = keyframes.length - 1; i >= 0; i--) { if (currentFrame >= keyframes[i].frame) {
+                    kfIndex = i; break; } }
+            const kf = keyframes[kfIndex];
+            const nextKf = (kfIndex < keyframes.length - 1) ? keyframes[kfIndex + 1] : null;
+            let cameraPos, cameraTarget; if (nextKf) { const range = nextKf.frame - kf.frame;
+                const t = range === 0 ? 0 : (currentFrame - kf.frame) / range;
+                cameraPos = [kf.keyframe.cameraPos[0] + (nextKf.keyframe.cameraPos[0] - kf.keyframe.cameraPos[0]) * t, kf
+                    .keyframe.cameraPos[1] + (nextKf.keyframe.cameraPos[1] - kf.keyframe.cameraPos[1]) * t, kf.keyframe
+                    .cameraPos[2] + (nextKf.keyframe.cameraPos[2] - kf.keyframe.cameraPos[2]) * t
+                ];
+                cameraTarget = [kf.keyframe.cameraTarget[0] + (nextKf.keyframe.cameraTarget[0] - kf.keyframe.cameraTarget[
+                        0]) * t, kf.keyframe.cameraTarget[1] + (nextKf.keyframe.cameraTarget[1] - kf.keyframe
+                    .cameraTarget[1]) * t, kf.keyframe.cameraTarget[2] + (nextKf.keyframe.cameraTarget[2] - kf.keyframe
+                    .cameraTarget[2]) * t]; } else { cameraPos = kf.keyframe.cameraPos;
+                cameraTarget = kf.keyframe.cameraTarget; }
+            const hold = kf.holdFrames || 0;
+            const effectiveCharStart = kf.frame + hold;
+            let charModels; if (hold > 0 && currentFrame <= effectiveCharStart) { charModels = JSON.parse(JSON.stringify(kf
+                    .keyframe.models)); } else if (nextKf && currentFrame >= effectiveCharStart && currentFrame <= nextKf
+                .frame) { const range = nextKf.frame - effectiveCharStart;
+                const t = range === 0 ? 0 : (currentFrame - effectiveCharStart) / range; if (kf.interpolation === 'step') {
+                    charModels = JSON.parse(JSON.stringify(kf.keyframe.models)); } else { const interpChar =
+                        interpolateKeyframesForCharacters(kf.keyframe, nextKf.keyframe, t);
+                    charModels = interpChar.models; } } else { const targetKf = (currentFrame <= keyframes[0].frame) ?
+                    keyframes[0] : keyframes[keyframes.length - 1];
+                charModels = JSON.parse(JSON.stringify(targetKf.keyframe.models)); } return { cameraPos, cameraTarget,
+                models: charModels }; }
+
+        async function exportFullFrameSequence() { if (panels.length === 0) { alert('No panels to export'); return; }
+            document.getElementById('status').innerHTML =
+                '🎬 Exporting full frame sequence with production labels...';
+            const progressDiv = document.getElementById('progress-container');
+            progressDiv.style.display = 'block';
+            const zip = new JSZip();
+            let globalTimingLines = [`# Full Frame Sequence Export`, `# FPS: ${FPS}`,
+                `# Panels: ${panels.length}`, ''
+            ]; for (let pIdx = 0; pIdx < panels.length; pIdx++) { const panel = panels[pIdx]; if (!panel.timeline || !
+                    panel.timeline.keyframes.length) continue;
+                const totalFrames = Math.round(panel.timeline.duration * FPS);
+                const keyframes = panel.timeline.keyframes.slice().sort((a, b) => a.frame - b.frame);
+                const panelTimingLines = [`# Panel: "${panel.name}"`, `# Total frames: ${totalFrames}`, ''];
+                panelTimingLines.push('# Keyframes:'); for (let i = 0; i < keyframes.length; i++) { const kf = keyframes[
+                    i];
+                    const hold = kf.holdFrames || 0;
+                    const letter = getLetter(i);
+                    panelTimingLines.push(`  ${letter} at frame ${kf.frame}, hold: ${hold} frames`); }
+                panelTimingLines.push('');
+                panelTimingLines.push('# Frame sequence:'); for (let f = 0; f < totalFrames; f++) { progressDiv.innerHTML =
+                        `<span class="loading-spinner"></span> Panel ${pIdx+1}/${panels.length} – Frame ${f+1}/${totalFrames}`;
+                    let kfIdx = -1; for (let i = keyframes.length - 1; i >= 0; i--) { if (f >= keyframes[i].frame) {
+                            kfIdx = i; break; } } if (kfIdx === -1) continue;
+                    const kf = keyframes[kfIdx];
+                    const hold = kf.holdFrames || 0;
+                    const letter = getLetter(kfIdx);
+                    const nextKf = (kfIdx < keyframes.length - 1) ? keyframes[kfIdx + 1] : null;
+                    let label = '';
+                    let isHoldFrame = false; if (f === kf.frame) { label = letter; } else if (hold > 0 && f > kf
+                        .frame && f <= kf.frame + hold) { isHoldFrame = true;
+                        panelTimingLines.push(
+                            `  frame ${f}: HOLD of ${letter} (${(f/FPS).toFixed(2)}s)`); continue; } else if (
+                        nextKf && f > kf.frame && f < nextKf.frame) { const effectiveStart = kf.frame + hold;
+                        const inbetweenNum = f - effectiveStart;
+                        label = letter + inbetweenNum; } else if (!nextKf && f > kf.frame) { const effectiveStart =
+                            kf.frame + hold;
+                        const inbetweenNum = f - effectiveStart;
+                        label = letter + inbetweenNum; } else { label = letter; }
+                    const state = getFrameState(panel, f);
+                    const dataURL = await renderHighQualityCapture(state, 'png', 1.0);
+                    const img = await loadImage(dataURL);
+                    const stampedCanvas = document.createElement('canvas');
+                    const stampHeight = 40;
+                    stampedCanvas.width = img.width;
+                    stampedCanvas.height = img.height + stampHeight;
+                    const ctx = stampedCanvas.getContext('2d');
+                    ctx.fillStyle = '#1a1a2e';
+                    ctx.fillRect(0, img.height, stampedCanvas.width, stampHeight);
+                    ctx.drawImage(img, 0, 0);
+                    ctx.fillStyle = '#ff8844';
+                    ctx.font = '20px monospace';
+                    const timeStr = (f / FPS).toFixed(2) + 's';
+                    const holdInfo = (f === kf.frame && hold > 0) ? `  Hold:${hold}` : '';
+                    ctx.fillText(`${panel.name}  |  ${label}  |  F${f}${holdInfo}  |  ${timeStr}`, 20, img.height +
+                    28);
+                    const stampedDataURL = stampedCanvas.toDataURL('image/png');
+                    const base64 = stampedDataURL.split(',')[1];
+                    zip.file(
+                        `panel_${String(pIdx).padStart(2,'0')}_${panel.name.replace(/\s/g,'_')}_${label}.png`,
+                        base64, { base64: true });
+                    panelTimingLines.push(`  frame ${f}: ${label} (${timeStr})`); }
+                zip.file(`panel_${String(pIdx).padStart(2,'0')}_${panel.name.replace(/\s/g,'_')}_timing.txt`,
+                    panelTimingLines.join('\n'));
+                globalTimingLines.push(
+                    `Panel "${panel.name}": ${totalFrames} frames, ${keyframes.length} keyframes`); }
+            zip.file('_full_timing.txt', globalTimingLines.join('\n'));
+            const blob = await zip.generateAsync({ type: 'blob' });
+            const a = document.createElement('a');
+            a.download = `full_frame_sequence_${Date.now()}.zip`;
+            a.href = URL.createObjectURL(blob);
+            a.click();
+            URL.revokeObjectURL(a.href);
+            progressDiv.style.display = 'none';
+            document.getElementById('status').innerHTML =
+                '✅ Full frame sequence exported with production labels (A, A1, A2, B, B1...)'; }
+        // ============================================================
+        // SECTION END: EXPORT_FUNCTIONS
+        // ============================================================
+
+        // ============================================================
+// SECTION START: UI_EVENTS_AND_TIMELINE_INTERACTION
+// ============================================================
+function closeTimelineIfNeeded() { if (timelineVisible) { timelineVisible = false;
+        document.getElementById('timeline-bar').classList.add('collapsed');
+        updateTimelineButtonPosition(); } }
+
+function updateTimelineButtonPosition() { const btn = document.getElementById('timeline-toggle-btn'); if (
+        timelineVisible) { btn.style.bottom = '155px'; } else { btn.style.bottom = '20px'; } }
+
+document.getElementById('gear-btn').onclick = () => { const g = document.getElementById('gear-menu');
+    const isOpen = g.style.display === 'block';
+    g.style.display = isOpen ? 'none' : 'block';
+    document.getElementById('panels-menu').style.display = 'none';
+    document.getElementById('gallery-modal').style.display = 'none'; if (!isOpen) closeTimelineIfNeeded(); };
+document.getElementById('panels-btn').onclick = () => { const p = document.getElementById('panels-menu');
+    const isOpen = p.style.display === 'block';
+    p.style.display = isOpen ? 'none' : 'block';
+    document.getElementById('gear-menu').style.display = 'none';
+    document.getElementById('gallery-modal').style.display = 'none'; if (!isOpen) { renderPanelGrid();
+        closeTimelineIfNeeded(); } };
+document.getElementById('gallery-btn').onclick = () => { const gallery = document.getElementById('gallery-modal');
+    const isOpen = gallery.style.display === 'flex';
+    gallery.style.display = isOpen ? 'none' : 'flex';
+    document.getElementById('gear-menu').style.display = 'none';
+    document.getElementById('panels-menu').style.display = 'none'; if (!isOpen) { renderGallery();
+        closeTimelineIfNeeded(); } };
+document.getElementById('close-gallery').onclick = () => { document.getElementById('gallery-modal').style.display =
+        'none'; };
+document.getElementById('export-pdf-gallery-btn').onclick = exportAllPanelsAsPDF;
+document.getElementById('export-full-frame-seq-btn').onclick = exportFullFrameSequence;
+document.getElementById('new-panel').onclick = () => { const name = prompt('Panel name (optional):');
+    createPanel(name && name.trim() ? name : undefined); };
+
+// ========== FULL PROJECT SAVE / LOAD (COMPLETE) ==========
+document.getElementById('save-full-project').onclick = async () => {
+    document.getElementById('status').innerHTML = '💾 Saving full project...';
+    const progressDiv = document.getElementById('progress-container');
+    progressDiv.style.display = 'block';
+    progressDiv.innerHTML = '<span class="loading-spinner"></span> Preparing project data...';
+
+    const modelsData = [];
+    for (const model of loadedModels) {
+        const modelEntry = {
+            id: model.userData.id,
+            name: model.userData.name,
+            fileData: model.userData.fileData,
+            inScene: model.userData.inScene
+        };
+        modelsData.push(modelEntry);
+    }
+
+    const serializedShaders = globalShaders.map(s => {
+        if (s.type === 'gradient') {
+            return {
+                type: s.type,
+                params: {
+                    stops: s.params.stops.map(st => ({
+                        pos: st.pos,
+                        color: { r: st.color.r, g: st.color.g, b: st.color.b }
+                    })),
+                    intensity: s.params.intensity
+                }
+            };
+        } else {
+            const cleanParams = {};
+            for (const [k, v] of Object.entries(s.params)) {
+                if (typeof v === 'number') cleanParams[k] = v;
+            }
+            return { type: s.type, params: cleanParams };
+        }
+    });
+
+    const projectData = {
+        version: 20,
+        FPS: FPS,
+        currentPanelId: currentPanelId,
+        models: modelsData,
+        panels: panels,
+        globalShaders: serializedShaders,
+        allUploadedFiles: allUploadedFiles,
+        activeModelId: activeModel ? activeModel.userData.id : null,
+        cameraPos: [camera.position.x, camera.position.y, camera.position.z],
+        cameraTarget: [orbit.target.x, orbit.target.y, orbit.target.z]
+    };
+
+    const jsonStr = JSON.stringify(projectData);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.download = `keypose_project_${Date.now()}.json`;
+    a.href = url;
+    a.click();
+    URL.revokeObjectURL(url);
+    progressDiv.style.display = 'none';
+    document.getElementById('status').innerHTML =
+        `💾 Full project saved (${loadedModels.length} models, ${panels.length} panels, ${globalShaders.length} shaders, ${allUploadedFiles.length} source files)`;
+};
+
+document.getElementById('load-full-project').onclick = () => {
+    const inp = document.createElement('input');
+    inp.type = 'file';
+    inp.accept = 'application/json';
+    inp.onchange = async (e) => {
+        if (!e.target.files[0]) return;
+        const progressDiv = document.getElementById('progress-container');
+        progressDiv.style.display = 'block';
+        progressDiv.innerHTML = '<span class="loading-spinner"></span> Loading project...';
+        document.getElementById('status').innerHTML = '📂 Loading project...';
+
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+            try {
+                const data = JSON.parse(ev.target.result);
+                if (data.version < 5 || !data.models || !data.panels) {
+                    alert('Invalid project file format');
+                    progressDiv.style.display = 'none';
+                    return;
+                }
+
+                // Clear everything
+                loadedModels.forEach(m => {
+                    if (m.userData.inScene) removeModelFromScene(m);
+                    if (m.userData.markers) m.userData.markers.forEach(marker => scene.remove(
+                        marker));
+                    scene.remove(m);
+                });
+                loadedModels = [];
+                mixerMap.clear();
+                panels = [];
+                currentPanelId = null;
+                globalShaders = [];
+                allUploadedFiles = [];
+                activeModel = null;
+                activePanelForTimeline = null;
+                selectedKeyframeIndex = -1;
+                document.getElementById('selected-keyframe-status').style.display = 'none';
+                timelinePlaying = false;
+                currentTimeNormalized = 0;
+
+                // Restore FPS
+                if (data.FPS) FPS = data.FPS;
+                document.getElementById('fps-input').value = FPS;
+
+                // Restore all uploaded files
+                if (data.allUploadedFiles) {
+                    allUploadedFiles = data.allUploadedFiles;
+                }
+
+                // Reconstruct all source files and load models
+                if (allUploadedFiles.length > 0) {
+                    const gltfFilesData = allUploadedFiles.filter(f => f.name.endsWith(
+                        '.gltf'));
+                    const glbFilesData = allUploadedFiles.filter(f => f.name.endsWith('.glb'));
+                    const binFilesData = allUploadedFiles.filter(f => f.name.endsWith('.bin'));
+                    const imageFilesData = allUploadedFiles.filter(f => /\.(png|jpg|jpeg|webp|bmp)$/i
+                        .test(f.name));
+
+                    // Reconstruct all files as blobs
+                    const allReconstructedFiles = [];
+                    for (const fileData of allUploadedFiles) {
+                        const resp = await fetch(fileData.data);
+                        const blob = await resp.blob();
+                        const file = new File([blob], fileData.name, { type: fileData.type ||
+                                'application/octet-stream' });
+                        allReconstructedFiles.push(file);
+                    }
+                    const gltfFiles = allReconstructedFiles.filter(f => f.name.endsWith('.gltf'));
+                    const glbFiles = allReconstructedFiles.filter(f => f.name.endsWith('.glb'));
+                    const binFiles = allReconstructedFiles.filter(f => f.name.endsWith('.bin'));
+                    const imageFiles = allReconstructedFiles.filter(f => /\.(png|jpg|jpeg|webp|bmp)$/i
+                        .test(f.name));
+
+                    // Process GLB files
+                    for (const glbFile of glbFiles) {
+                        const url = URL.createObjectURL(glbFile);
+                        try {
+                            const loader = new GLTFLoader();
+                            const gltf = await new Promise((res, rej) => loader.load(url, res,
+                                undefined, rej));
+                            URL.revokeObjectURL(url);
+                            const model = gltf.scene;
+                            const modelData = data.models.find(m => m.name === glbFile.name);
+                            const modelId = modelData ? modelData.id : (Date.now() + '-' + Math
+                                .random());
+                            model.userData = {
+                                id: modelId,
+                                name: glbFile.name,
+                                inScene: false,
+                                bones: [],
+                                markers: [],
+                                fileData: allUploadedFiles.find(f => f.name === glbFile.name)
+                                    ?.data || ''
+                            };
+                            let bones = [];
+                            model.traverse(c => { if (c.isBone) bones.push(c); });
+                            model.traverse(c => { if (c.isSkinnedMesh && c.skeleton) c.skeleton.bones
+                                    .forEach(b => { if (!bones.includes(b)) bones.push(b); }); });
+                            bones = [...new Map(bones.map(b => [b.id, b])).values()];
+                            model.userData.bones = bones;
+                            const markers = createBoneMarkers(model, bones);
+                            model.userData.markers = markers;
+                            if (gltf.animations && gltf.animations.length) {
+                                const mixer = new THREE.AnimationMixer(model);
+                                mixer.clipAction(gltf.animations[0]).play();
+                                mixer.timeScale = 0;
+                                mixerMap.set(model, mixer);
+                            }
+                            loadedModels.push(model);
+                        } catch (err) {
+                            addDebugLog(`Reload GLB error: ${err.message}`);
+                        }
+                    }
+
+                    // Process GLTF files
+                    for (const gltfFile of gltfFiles) {
+                        const resourceBlobUrls = new Map();
+                        for (const binFile of binFiles) {
+                            const blob = new Blob([await binFile.arrayBuffer()], { type: 'application/octet-stream' });
+                            resourceBlobUrls.set(binFile.name, URL.createObjectURL(blob));
+                        }
+                        for (const imgFile of imageFiles) {
+                            const blob = new Blob([await imgFile.arrayBuffer()], { type: imgFile
+                                    .type });
+                            resourceBlobUrls.set(imgFile.name, URL.createObjectURL(blob));
+                        }
+                        let gltfText = await gltfFile.text();
+                        let modifiedGltf = gltfText;
+                        const uriRegex = /"uri"\s*:\s*"([^"]+)"/gi;
+                        let match;
+                        while ((match = uriRegex.exec(gltfText)) !== null) {
+                            const originalUri = match[1];
+                            const ext = originalUri.split('.').pop().toLowerCase();
+                            if (ext === 'bin' || ['png', 'jpg', 'jpeg', 'webp', 'bmp'].includes(
+                                    ext)) {
+                                let filename = originalUri.split('/').pop().split('\\').pop();
+                                let blobUrl = null;
+                                for (let [storedName, url] of resourceBlobUrls.entries()) {
+                                    if (storedName === filename || storedName.toLowerCase() ===
+                                        filename.toLowerCase()) { blobUrl = url; break; }
+                                }
+                                if (blobUrl) modifiedGltf = modifiedGltf.replace(
+                                    `"${originalUri}"`, `"${blobUrl}"`);
+                            }
+                        }
+                        const modifiedBlob = new Blob([modifiedGltf], { type: 'application/json' });
+                        const modifiedUrl = URL.createObjectURL(modifiedBlob);
+                        try {
+                            const loader = new GLTFLoader();
+                            const gltf = await new Promise((res, rej) => loader.load(modifiedUrl, res,
+                                undefined, rej));
+                            URL.revokeObjectURL(modifiedUrl);
+                            const model = gltf.scene;
+                            const modelData = data.models.find(m => m.name === gltfFile.name);
+                            const modelId = modelData ? modelData.id : (Date.now() + '-' + Math
+                                .random());
+                            model.userData = {
+                                id: modelId,
+                                name: gltfFile.name,
+                                inScene: false,
+                                bones: [],
+                                markers: [],
+                                fileData: allUploadedFiles.find(f => f.name === gltfFile.name)
+                                    ?.data || ''
+                            };
+                            let bones = [];
+                            model.traverse(c => { if (c.isBone) bones.push(c); });
+                            model.traverse(c => { if (c.isSkinnedMesh && c.skeleton) c.skeleton.bones
+                                    .forEach(b => { if (!bones.includes(b)) bones.push(b); }); });
+                            bones = [...new Map(bones.map(b => [b.id, b])).values()];
+                            model.userData.bones = bones;
+                            const markers = createBoneMarkers(model, bones);
+                            model.userData.markers = markers;
+                            if (gltf.animations && gltf.animations.length) {
+                                const mixer = new THREE.AnimationMixer(model);
+                                mixer.clipAction(gltf.animations[0]).play();
+                                mixer.timeScale = 0;
+                                mixerMap.set(model, mixer);
+                            }
+                            loadedModels.push(model);
+                        } catch (err) {
+                            addDebugLog(`Reload GLTF error: ${err.message}`);
+                        }
+                        for (let url of resourceBlobUrls.values()) URL.revokeObjectURL(url);
+                    }
+
+                    // Restore inScene state
+                    for (const modelData of data.models) {
+                        const model = loadedModels.find(m => m.userData.id === modelData.id);
+                        if (model && modelData.inScene) {
+                            addModelToScene(model);
+                        }
+                    }
+                }
+
+                // Restore shaders
+                if (data.globalShaders) {
+                    for (const shaderData of data.globalShaders) {
+                        const def = shaderDefs[shaderData.type];
+                        if (def) {
+                            let params;
+                            if (shaderData.type === 'gradient') {
+                                params = {
+                                    stops: shaderData.params.stops.map(st => ({
+                                        pos: st.pos,
+                                        color: new THREE.Color(st.color.r, st.color.g, st
+                                            .color.b)
+                                    })),
+                                    intensity: shaderData.params.intensity
+                                };
+                            } else {
+                                params = { ...shaderData.params };
+                            }
+                            const newShader = { type: shaderData.type, params: params, pass: def
+                                    .createPass() };
+                            def.updatePass(newShader.pass, newShader.params);
+                            globalShaders.push(newShader);
+                        }
+                    }
+                }
+
+                // Restore panels
+                panels = data.panels || [];
+                currentPanelId = data.currentPanelId || null;
+
+                // Restore camera
+                if (data.cameraPos) {
+                    camera.position.set(data.cameraPos[0], data.cameraPos[1], data.cameraPos[2]);
+                    orbit.target.set(data.cameraTarget[0], data.cameraTarget[1], data.cameraTarget[
+                        2]);
+                    orbit.update();
+                }
+
+                // Restore active model
+                if (data.activeModelId) {
+                    const found = loadedModels.find(m => m.userData.id === data.activeModelId && m
+                        .userData.inScene);
+                    if (found) setActiveModel(found);
+                }
+
+                updateModelListUI();
+                renderPanelGrid();
+                updateShaderListUI();
+
+                // Restore timeline
+                const currentPanel = getCurrentPanel();
+                if (currentPanel) {
+                    activePanelForTimeline = currentPanel;
+                    updateTimelineUIFromPanel(currentPanel);
+                    document.getElementById('timeline-bar').style.display = 'flex';
+                    timelineVisible = true;
+                    updateTimelineButtonPosition();
+                    scrubToTime(0);
+                } else {
+                    document.getElementById('timeline-bar').style.display = 'none';
+                }
+
+                rebuildComposerForModel(activeModel);
+                progressDiv.style.display = 'none';
+                document.getElementById('status').innerHTML =
+                    `📂 Full project loaded (${loadedModels.length} models, ${panels.length} panels, ${globalShaders.length} shaders)`;
+            } catch (err) {
+                console.error(err);
+                alert('Error loading project: ' + err.message);
+                progressDiv.style.display = 'none';
+            }
+        };
+        reader.readAsText(e.target.files[0]);
+    };
+    inp.click();
+};
+
+document.getElementById('close-param').onclick = () => document.getElementById('param-panel').style.display =
+    'none';
+
+// Timeline toggle
+let timelineVisible = true;
+const timelineBar = document.getElementById('timeline-bar');
+document.getElementById('timeline-toggle-btn').onclick = () => { timelineVisible = !timelineVisible; if (
+        timelineVisible) { timelineBar.classList.remove('collapsed'); } else { timelineBar.classList.add(
+        'collapsed'); }
+    updateTimelineButtonPosition(); };
+updateTimelineButtonPosition();
+
+// ============================
+// 🎯  COMPLETELY FIXED TIMELINE CANVAS INTERACTION  🎯
+// ============================
+const canvasTL = document.getElementById('timelineCanvas');
+let isDraggingPlayhead = false;
+let isDraggingKeyframe = false;
+let dragKeyframeIndex = -1;
+let holdDragIndex = -1;
+
+// Helper to sync timeline after any modification (dragging)
+function syncTimelineAfterDrag() {
+    if (activePanelForTimeline && activePanelForTimeline === getCurrentPanel()) {
+        const panelTarget = panels.find(p => p.id === activePanelForTimeline.id);
+        if (panelTarget) panelTarget.timeline = activePanelForTimeline.timeline;
+        if (isCollaborative && sharedTimelines) {
+            updateSharedTimeline(activePanelForTimeline.id, activePanelForTimeline.timeline);
+        }
+    }
+    drawTimelineCanvas();
+}
+
+canvasTL.addEventListener('mousedown', (e) => {
+    if (!activePanelForTimeline) return;
+    const rect = canvasTL.getBoundingClientRect();
+    const scaleX = canvasTL.width / rect.width;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top);
+    const totalFrames = Math.round(activePanelForTimeline.timeline.duration * FPS);
+    const keyframes = activePanelForTimeline.timeline?.keyframes || [];
+    const w = canvasTL.width;
+    const h = canvasTL.height;
+
+    // 1) Hold‑arrow hit test (arrow is always present, offset to the right of the dot)
+    for (let i = 0; i < keyframes.length; i++) {
+        const kf = keyframes[i];
+        const hold = kf.holdFrames || 0;
+        const kfX = (kf.frame / totalFrames) * w;
+        const handleX = ((kf.frame + hold) / totalFrames) * w;
+        const minX = hold > 0 ? kfX + 10 : kfX + 8;
+        const maxX = hold > 0 ? handleX + 14 : kfX + 24;
+        if (x >= minX && x <= maxX && y >= h/2 - 14 && y <= h/2 + 14) {
+            holdDragIndex = i;
+            document.body.style.cursor = 'ew-resize';
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+        }
+    }
+
+    // 2) Keyframe‑dot hit test (circle with radius 14)
+    for (let i = 0; i < keyframes.length; i++) {
+        const kfX = (keyframes[i].frame / totalFrames) * w;
+        const dist = Math.hypot(x - kfX, y - h/2);
+        if (dist <= 14) {
+            isDraggingKeyframe = true;
+            dragKeyframeIndex = i;
+            selectedKeyframeIndex = i;
+            document.getElementById('selected-keyframe-status').style.display = 'inline-block';
+            drawTimelineCanvas();
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+        }
+    }
+
+    // 3) Fallback: move playhead
+    isDraggingPlayhead = true;
+    selectedKeyframeIndex = -1;
+    document.getElementById('selected-keyframe-status').style.display = 'none';
+    scrubToTime(Math.min(1, Math.max(0, x / w)));
+    e.preventDefault();
+    e.stopPropagation();
+});
+
+window.addEventListener('mousemove', (e) => {
+    if (!activePanelForTimeline) return;
+    const rect = canvasTL.getBoundingClientRect();
+    const scaleX = canvasTL.width / rect.width;
+    let x = (e.clientX - rect.left) * scaleX;
+    x = Math.min(canvasTL.width, Math.max(0, x));
+    const norm = x / canvasTL.width;
+    const totalFrames = Math.round(activePanelForTimeline.timeline.duration * FPS);
+    const keyframes = activePanelForTimeline.timeline?.keyframes || [];
+
+    if (isDraggingPlayhead) {
+        scrubToTime(norm);
+    } else if (isDraggingKeyframe && dragKeyframeIndex !== -1) {
+        const prevKf = dragKeyframeIndex > 0 ? keyframes[dragKeyframeIndex - 1] : null;
+        const nextKf = dragKeyframeIndex < keyframes.length - 1 ? keyframes[dragKeyframeIndex + 1] : null;
+        let newFrame = Math.round(norm * totalFrames);
+        if (document.getElementById('timeline-snap').checked) newFrame = Math.round(newFrame);
+        const min = prevKf ? prevKf.frame + 1 : 0;
+        const max = nextKf ? nextKf.frame - 1 : totalFrames;
+        newFrame = Math.min(max, Math.max(min, newFrame));
+        keyframes[dragKeyframeIndex].frame = newFrame;
+        drawTimelineCanvas();
+        scrubToTime(currentTimeNormalized);
+    } else if (holdDragIndex !== -1) {
+        const kf = keyframes[holdDragIndex];
+        const nextKf = holdDragIndex < keyframes.length - 1 ? keyframes[holdDragIndex + 1] : null;
+        const newEndFrame = Math.round(norm * totalFrames);
+        let newHold = Math.max(0, newEndFrame - kf.frame);
+        if (nextKf) newHold = Math.min(newHold, nextKf.frame - kf.frame - 1);
+        kf.holdFrames = newHold;
+        drawTimelineCanvas();
+    }
+    e.preventDefault();
+});
+
+window.addEventListener('mouseup', () => {
+    if (isDraggingKeyframe && dragKeyframeIndex !== -1 && activePanelForTimeline) {
+        const keyframes = activePanelForTimeline.timeline.keyframes;
+        keyframes.sort((a, b) => a.frame - b.frame);
+        selectedKeyframeIndex = keyframes.findIndex(k => k.frame === keyframes[dragKeyframeIndex]?.frame);
+        if (selectedKeyframeIndex === -1) selectedKeyframeIndex = dragKeyframeIndex;
+        syncTimelineAfterDrag();   // <-- SYNC AFTER MOVE
+    }
+    if (holdDragIndex !== -1 && activePanelForTimeline) {
+        syncTimelineAfterDrag();   // <-- SYNC AFTER HOLD ADJUST
+    }
+    isDraggingPlayhead = false;
+    isDraggingKeyframe = false;
+    dragKeyframeIndex = -1;
+    holdDragIndex = -1;
+    document.body.style.cursor = 'default';
+});
+
+// ========== CONTEXT MENU ==========
+const contextMenu = document.getElementById('timeline-context-menu');
+canvasTL.addEventListener('contextmenu', (e) => { e.preventDefault(); if (!activePanelForTimeline) return;
+    const rect = canvasTL.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const totalFrames = Math.round(activePanelForTimeline.timeline.duration * FPS);
+    const keyframes = activePanelForTimeline.timeline?.keyframes || [];
+    let minDist = 10,
+        foundIdx = -1; for (let i = 0; i < keyframes.length; i++) { const kfx = (keyframes[i].frame / totalFrames) *
+            rect.width;
+        const dist = Math.abs(kfx - x); if (dist < minDist) { minDist = dist;
+            foundIdx = i; } } if (foundIdx !== -1 && minDist < 12) { selectedKeyframeIndex = foundIdx;
+        drawTimelineCanvas();
+        document.getElementById('selected-keyframe-status').style.display = 'inline-block';
+        let left = e.clientX,
+            top = e.clientY - 200;
+        const menuWidth = 180; if (left + menuWidth > window.innerWidth) left = window.innerWidth - menuWidth -
+            10; if (top < 10) top = e.clientY + 20;
+        contextMenu.style.left = left + 'px';
+        contextMenu.style.top = top + 'px';
+        contextMenu.style.display = 'flex';
+        document.getElementById('ctx-copy').onclick = () => { copySelectedKeyframe();
+            contextMenu.style.display = 'none'; };
+        document.getElementById('ctx-paste').onclick = () => { pasteKeyframeAtCurrentTime();
+            contextMenu.style.display = 'none'; };
+        document.getElementById('ctx-delete').onclick = () => { deleteSelectedKeyframe();
+            contextMenu.style.display = 'none'; };
+        document.getElementById('ctx-update').onclick = () => { updateSelectedKeyframe();
+            contextMenu.style.display = 'none'; };
+        document.getElementById('ctx-set-frame').onclick = () => { setKeyframeFrameNumber();
+            contextMenu.style.display = 'none'; };
+        document.getElementById('ctx-set-hold').onclick = () => { setKeyframeHoldFrames();
+            contextMenu.style.display = 'none'; };
+        document.getElementById('ctx-toggle-interp').onclick = () => { toggleKeyframeInterpolation();
+            contextMenu.style.display = 'none'; }; } else { let left = e.clientX,
+            top = e.clientY - 100; if (left + 180 > window.innerWidth) left = window.innerWidth - 180 - 10; if (
+            top < 10) top = e.clientY + 20;
+        contextMenu.style.left = left + 'px';
+        contextMenu.style.top = top + 'px';
+        contextMenu.style.display = 'flex';
+        document.getElementById('ctx-copy').onclick = () => { contextMenu.style.display = 'none'; };
+        document.getElementById('ctx-paste').onclick = () => { pasteKeyframeAtCurrentTime();
+            contextMenu.style.display = 'none'; };
+        document.getElementById('ctx-delete').onclick = () => { contextMenu.style.display = 'none'; };
+        document.getElementById('ctx-update').onclick = () => { contextMenu.style.display = 'none'; };
+        document.getElementById('ctx-set-frame').onclick = () => { contextMenu.style.display = 'none'; };
+        document.getElementById('ctx-set-hold').onclick = () => { contextMenu.style.display = 'none'; };
+        document.getElementById('ctx-toggle-interp').onclick = () => { contextMenu.style.display = 'none'; }; } });
+window.addEventListener('click', () => { contextMenu.style.display = 'none'; });
+
+// Button handlers
+document.getElementById('timeline-play-btn').onclick = () => { if (!activePanelForTimeline) return; if (
+        timelinePlaying) { timelinePlaying = false;
+        document.getElementById('timeline-play-btn').innerHTML = '▶️ Play'; } else {
+        startTimelinePlayback();
+        document.getElementById('timeline-play-btn').innerHTML = '⏸️ Pause'; } };
+document.getElementById('timeline-stop-btn').onclick = () => { timelinePlaying = false;
+    scrubToTime(0);
+    document.getElementById('timeline-play-btn').innerHTML = '▶️ Play'; };
+document.getElementById('timeline-add-key-btn').onclick = () => { if (activePanelForTimeline)
+addKeyframeAtTime(currentTimeNormalized); };
+document.getElementById('timeline-update-key-btn').onclick = () => updateSelectedKeyframe();
+document.getElementById('timeline-duration-input').addEventListener('change', (e) => { if (
+        activePanelForTimeline) { activePanelForTimeline.timeline.duration = parseFloat(e.target.value);
+        timelineDuration = activePanelForTimeline.timeline.duration; if (activePanelForTimeline ===
+            getCurrentPanel()) { const panelTarget = panels.find(p => p.id === activePanelForTimeline.id); if (
+                panelTarget) panelTarget.timeline = activePanelForTimeline.timeline; }
+        drawTimelineCanvas();
+        document.getElementById('total-time-display').innerText =
+            `${timelineDuration.toFixed(2)}s / ${Math.round(timelineDuration*FPS)} frames`;
+        scrubToTime(currentTimeNormalized); } });
+document.getElementById('fps-input').addEventListener('change', (e) => { FPS = parseInt(e.target.value) || 24; if (
+        activePanelForTimeline) { updateTimelineUIFromPanel(activePanelForTimeline);
+        scrubToTime(currentTimeNormalized); } });
+document.getElementById('timeline-snap').addEventListener('change', () => drawTimelineCanvas());
+
+// ========== PREVIEW MODAL ==========
+let previewPlaying = false,
+    previewAnimFrame = null,
+    previewStartTime = 0,
+    previewCurrentTime = 0,
+    previewDuration = 2;
+let previewCanvas = null,
+    previewCtx = null;
+
+function drawPreviewWithMargins() { if (!previewCanvas || !previewCtx) return;
+    const aspectSetting = document.getElementById('capture-aspect').value;
+    const addMargins = document.getElementById('capture-margins').checked;
+    const srcCanvas = renderer.domElement;
+    let cropWidth = srcCanvas.width,
+        cropHeight = srcCanvas.height;
+    let targetAspect = null; if (aspectSetting !== 'screen') { switch (aspectSetting) { case '16:9':
+            targetAspect = 16 / 9; break; case '4:3': targetAspect = 4 / 3; break; case '1:1':
+            targetAspect = 1; break; case 'b4': targetAspect = 257 / 364; break; case 'shonen':
+            targetAspect = 180 / 270; break; case 'a4': targetAspect = 210 / 297; break; case 'b5':
+            targetAspect = 182 / 257; break; case 'tankobon': targetAspect = 128 / 182; break; } if (
+            targetAspect) { const currentAspect = cropWidth / cropHeight; if (currentAspect > targetAspect) {
+                cropWidth = cropHeight * targetAspect; } else { cropHeight = cropWidth / targetAspect; } } }
+    const sx = (srcCanvas.width - cropWidth) / 2;
+    const sy = (srcCanvas.height - cropHeight) / 2;
+    previewCtx.drawImage(srcCanvas, sx, sy, cropWidth, cropHeight, 0, 0, previewCanvas.width, previewCanvas
+    .height); if (addMargins && aspectSetting !== 'screen') { const w = previewCanvas.width,
+            h = previewCanvas.height;
+        const basic = w * 0.13,
+            cut = w * 0.05,
+            tank = w * 0.08;
+        previewCtx.strokeStyle = '#3399ff';
+        previewCtx.lineWidth = 2;
+        previewCtx.strokeRect(basic, basic, w - basic * 2, h - basic * 2);
+        previewCtx.strokeStyle = '#ff3333';
+        previewCtx.strokeRect(cut, cut, w - cut * 2, h - cut * 2);
+        previewCtx.strokeStyle = '#33ff33';
+        previewCtx.strokeRect(tank, tank, w - tank * 2, h - tank * 2); } }
+
+function startPreviewPlayback() { if (previewPlaying) return;
+    previewPlaying = true;
+    previewStartTime = performance.now() / 1000 - previewCurrentTime;
+
+    function playLoop() { if (!previewPlaying) return;
+        const now = performance.now() / 1000;
+        let elapsed = now - previewStartTime; if (elapsed >= previewDuration) { elapsed = previewDuration;
+            previewPlaying = false;
+            document.getElementById('preview-play').innerHTML = '▶️ Play'; }
+        const t = elapsed / previewDuration;
+        document.getElementById('preview-scrub').value = t;
+        previewCurrentTime = elapsed;
+        document.getElementById('preview-time').innerText =
+            `${elapsed.toFixed(2)} / ${previewDuration.toFixed(2)} sec`;
+        scrubToTime(t);
+        drawPreviewWithMargins(); if (previewPlaying) previewAnimFrame = requestAnimationFrame(playLoop); }
+    previewAnimFrame = requestAnimationFrame(playLoop); }
+
+function stopPreviewPlayback() { previewPlaying = false; if (previewAnimFrame) cancelAnimationFrame(
+previewAnimFrame); }
+
+document.getElementById('view-shot-btn').onclick = async () => { if (!activePanelForTimeline) return;
+    previewDuration = activePanelForTimeline.timeline?.duration || 2;
+    document.getElementById('preview-panel-name').innerText = activePanelForTimeline.name;
+    previewCanvas = document.getElementById('previewCanvas');
+    previewCtx = previewCanvas.getContext('2d');
+    previewCanvas.width = 800;
+    previewCanvas.height = 450;
+    const scrub = document.getElementById('preview-scrub');
+    const timeDisplay = document.getElementById('preview-time');
+    scrub.oninput = (e) => { if (previewPlaying) { stopPreviewPlayback();
+            document.getElementById('preview-play').innerHTML = '▶️ Play'; }
+        const val = parseFloat(e.target.value);
+        previewCurrentTime = val * previewDuration;
+        timeDisplay.innerText = `${previewCurrentTime.toFixed(2)} / ${previewDuration.toFixed(2)} sec`;
+        scrubToTime(val);
+        drawPreviewWithMargins(); };
+    document.getElementById('preview-play').onclick = () => { if (previewPlaying) { stopPreviewPlayback();
+            document.getElementById('preview-play').innerHTML = '▶️ Play'; } else { startPreviewPlayback();
+            document.getElementById('preview-play').innerHTML = '⏸️ Pause'; } };
+    document.getElementById('preview-stop').onclick = () => { stopPreviewPlayback();
+        scrub.value = 0;
+        previewCurrentTime = 0;
+        timeDisplay.innerText = `0.00 / ${previewDuration.toFixed(2)} sec`;
+        scrubToTime(0);
+        drawPreviewWithMargins();
+        document.getElementById('preview-play').innerHTML = '▶️ Play'; };
+    document.getElementById('preview-modal').style.display = 'flex';
+    drawPreviewWithMargins(); };
+document.getElementById('close-preview').onclick = () => { stopPreviewPlayback();
+    document.getElementById('preview-modal').style.display = 'none'; };
+// ============================================================
+// SECTION END: UI_EVENTS_AND_TIMELINE_INTERACTION
+// ============================================================
+
+        // ============================================================
+        // SECTION START: ANIMATION_LOOP_AND_RESIZE
+        // ============================================================
+        let animPlaying = false;
+        window.addEventListener('keydown', (e) => { if (e.key === 'p' || e.key === 'P') { animPlaying = !animPlaying;
+                mixerMap.forEach(m => { if (m) m.timeScale = animPlaying ? 1 : 0; }); } });
+
+        function animate() { requestAnimationFrame(animate);
+            const delta = 1 / 60;
+            mixerMap.forEach(m => { if (m && m.timeScale > 0) m.update(delta); });
+            loadedModels.forEach(m => { if (m.userData.markers && bonesVisible && m.userData.inScene)
+                updateMarkersPosition(m.userData.markers); });
+            orbit.update();
+            composer.render(); }
+        animate();
+        window.addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight;
+            camera.updateProjectionMatrix();
+            composer.setSize(innerWidth, innerHeight);
+            drawTimelineCanvas(); });
+        updateModelListUI();
+        document.getElementById('status').innerHTML =
+            '✅ KeyPose | Camera on ones | Hold only affects character | Drag arrow to set hold frames | 💾 Save/Load preserves everything';
+        // ============================================================
+        // SECTION END: ANIMATION_LOOP_AND_RESIZE
+        // ============================================================
+    </script>
+</body>
+</html>
