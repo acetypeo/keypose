@@ -1,0 +1,262 @@
+================================================================================
+KEYPOSE EXTENSION STANDARD v1.0
+================================================================================
+
+This standard ensures any extension works with KeyPose’s panels, timeline keyframes,
+and full project save/load – even before the core extensionStates system is added.
+Write extensions following these rules, and they will be fully compatible with future
+KeyPose updates.
+
+================================================================================
+1. REQUIRED EXTENSION STRUCTURE
+================================================================================
+
+Every extension must export a default object with:
+
+{
+  id: "unique-identifier",          // string, never change
+  name: "Display Name",             // shown in extension list
+  type: "per-model" | "postprocess" | "light" | "tool",
+  params: { ... },                  // default parameters (loop, intensity, etc.)
+
+  init(api) { ... },                // called once when registered
+
+  // --- MANDATORY for state persistence (panels, keyframes, save/load) ---
+  getState() { ... },               // returns JSON-serializable object
+  restoreState(state) { ... },      // receives that object and restores visual state
+
+  // --- UI lifecycle (optional but recommended) ---
+  onSelect() { ... },               // build UI in #param-panel
+  onDeselect() { ... },             // hide panel, clean up listeners
+  dispose() { ... }                 // remove objects, textures, listeners
+}
+
+================================================================================
+2. THE API OBJECT (passed to init)
+================================================================================
+
+api contains everything you need:
+
+- api.THREE               // Three.js namespace
+- api.scene, api.camera, api.renderer, api.composer
+- api.orbit, api.gizmo    // OrbitControls and TransformControls
+- api.getActiveModel(), api.getLoadedModels()
+- api.addModelToScene(), api.removeModelFromScene()
+
+Use api.THREE for any Three.js classes, NOT the global THREE.
+
+================================================================================
+3. STATE PERSISTENCE (getState / restoreState)
+================================================================================
+
+Even though the current KeyPose core does not yet automatically call these methods,
+every extension MUST implement them. Future KeyPose versions WILL call them during
+panel capture, keyframe creation, and full project save/load.
+
+getState() example:
+  getState() {
+    return {
+      position: [this.helper.position.x, this.helper.position.y, this.helper.position.z],
+      rotation: [this.helper.rotation.x, this.helper.rotation.y, this.helper.rotation.z],
+      scale: [this.helper.scale.x, this.helper.scale.y, this.helper.scale.z],
+      intensity: this.params.intensity,
+      videoUrl: this.videoUrl,
+      loop: this.params.loop
+    };
+  }
+
+restoreState(state) example:
+  restoreState(state) {
+    if (state.position) this.helper.position.fromArray(state.position);
+    if (state.rotation) this.helper.rotation.fromArray(state.rotation);
+    if (state.scale) this.helper.scale.fromArray(state.scale);
+    if (state.intensity !== undefined) this.light.intensity = state.intensity;
+    // reload video if needed (use cache)
+  }
+
+- Always store the minimal data needed to restore the exact visual state.
+- For videos/textures, store the blob URL and reuse from a cache.
+- Do NOT store functions, DOM elements, or non‑serializable objects.
+
+================================================================================
+4. UI GUIDELINES (using #param-panel)
+================================================================================
+
+When onSelect() is called:
+
+- Set title: document.getElementById('param-title').innerText = this.name;
+- Get content div: const content = document.getElementById('param-content');
+- Clear it: content.innerHTML = '';
+- Build your controls (use class "param-row" for each group).
+- Show the panel: document.getElementById('param-panel').style.display = 'block';
+
+Example UI snippet:
+  const row = document.createElement('div');
+  row.className = 'param-row';
+  row.innerHTML = `<label>Intensity</label><input type="range" min="0" max="5" step="0.1" value="${this.params.intensity}"><span>${this.params.intensity}</span>`;
+  const slider = row.querySelector('input');
+  const span = row.querySelector('span');
+  slider.addEventListener('input', (e) => {
+    this.params.intensity = parseFloat(e.target.value);
+    span.innerText = this.params.intensity;
+    this.light.intensity = this.params.intensity;
+  });
+  content.appendChild(row);
+
+- In onDeselect(), hide the panel: document.getElementById('param-panel').style.display = 'none';
+
+================================================================================
+5. SELECTING MESHES (for per-model extensions)
+================================================================================
+
+Use Shift+Click to select meshes. The core already provides a global click handler
+that ignores UI elements. You must implement your own raycasting inside init():
+
+  const canvas = api.renderer.domElement;
+  const onMeshClick = (e) => {
+    if (!e.shiftKey) return;
+    // compute mouse, raycast, get mesh
+    // ignore decal helpers (if any)
+    // store selected meshes in a Set
+    // highlight them
+  };
+  canvas.addEventListener('click', onMeshClick);
+  this._cleanupSelection = () => canvas.removeEventListener('click', onMeshClick);
+
+- Store selected meshes in a Set (e.g., this.selectedMeshes).
+- Highlight by changing material emissive or color (store original to restore later).
+
+================================================================================
+6. WORKING WITH TRANSFORM CONTROLS (GIZMO)
+================================================================================
+
+If your extension needs a gizmo (move/rotate/scale), import TransformControls
+dynamically inside init() or onSelect():
+
+  const { TransformControls } = await import('three/addons/controls/TransformControls.js');
+  this.controls = new TransformControls(api.camera, api.renderer.domElement);
+  this.controls.attach(this.helper);
+  this.controls.setMode('translate'); // or 'rotate', 'scale'
+  this.controls.addEventListener('dragging-changed', (e) => { api.orbit.enabled = !e.value; });
+  api.scene.add(this.controls);
+
+- Store the controls so you can dispose them later.
+- Add a toggle button in the UI to hide/show the gizmo (set .visible property).
+- In restoreState(), recreate the helper and re‑attach controls.
+
+================================================================================
+7. HANDLING VIDEOS / TEXTURES
+================================================================================
+
+Load videos using a helper function that returns a VideoTexture and stores the blob URL.
+Keep a cache (Map) inside the extension to reuse textures when restoring state.
+
+  async _loadVideo(file, loop) {
+    const url = URL.createObjectURL(file);
+    const video = document.createElement('video');
+    video.autoplay = true;
+    video.muted = true;
+    video.loop = loop;
+    video.src = url;
+    await new Promise(resolve => { video.onloadeddata = resolve; });
+    video.play();
+    const texture = new this.api.THREE.VideoTexture(video);
+    this._videoCache.set(url, texture);
+    return { texture, video, url };
+  }
+
+In getState(), store the videoUrl. In restoreState(), if the URL is in cache, reuse it;
+otherwise reload (you may need to store the original File object or re‑fetch from blob).
+
+================================================================================
+8. CLEANUP (dispose)
+================================================================================
+
+Always remove all objects added to the scene, dispose textures, and remove event listeners:
+
+  dispose() {
+    if (this.light) this.api.scene.remove(this.light);
+    if (this.controls) {
+      this.controls.dispose();
+      this.api.scene.remove(this.controls);
+    }
+    if (this.helper) this.api.scene.remove(this.helper);
+    if (this._cleanupSelection) this._cleanupSelection();
+    // revoke blob URLs
+    if (this.videoUrl) URL.revokeObjectURL(this.videoUrl);
+    // dispose textures
+    if (this.videoTexture) this.videoTexture.dispose();
+  }
+
+================================================================================
+9. EXAMPLE – Minimal Working Extension
+================================================================================
+
+export default {
+  id: 'example-light',
+  name: 'Custom Light',
+  type: 'light',
+  params: { intensity: 1.0 },
+
+  init(api) {
+    this.api = api;
+    this.light = new api.THREE.DirectionalLight(0xffffff, this.params.intensity);
+    this.light.position.set(2,3,4);
+    api.scene.add(this.light);
+  },
+
+  getState() {
+    return {
+      position: [this.light.position.x, this.light.position.y, this.light.position.z],
+      intensity: this.params.intensity
+    };
+  },
+
+  restoreState(state) {
+    if (state.position) this.light.position.fromArray(state.position);
+    if (state.intensity !== undefined) {
+      this.params.intensity = state.intensity;
+      this.light.intensity = state.intensity;
+    }
+  },
+
+  onSelect() {
+    const title = document.getElementById('param-title');
+    const content = document.getElementById('param-content');
+    title.innerText = this.name;
+    content.innerHTML = '';
+    const row = document.createElement('div');
+    row.className = 'param-row';
+    row.innerHTML = `<label>Intensity</label><input type="range" min="0" max="5" step="0.1" value="${this.params.intensity}"><span>${this.params.intensity}</span>`;
+    const slider = row.querySelector('input');
+    const span = row.querySelector('span');
+    slider.addEventListener('input', (e) => {
+      this.params.intensity = parseFloat(e.target.value);
+      span.innerText = this.params.intensity;
+      this.light.intensity = this.params.intensity;
+    });
+    content.appendChild(row);
+    document.getElementById('param-panel').style.display = 'block';
+  },
+
+  onDeselect() {
+    document.getElementById('param-panel').style.display = 'none';
+  },
+
+  dispose() {
+    this.api.scene.remove(this.light);
+  }
+};
+
+================================================================================
+10. FUTURE-PROOFING NOTE
+================================================================================
+
+KeyPose’s core will soon automatically call getState() and restoreState() on every
+extension when capturing panels, keyframes, and saving/loading projects.
+By implementing these methods now, your extension will work immediately when that
+update arrives – no need to change anything later.
+
+================================================================================
+END OF STANDARD
+================================================================================

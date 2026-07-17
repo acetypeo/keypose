@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KeyPose Jiggle – Safe Rotation Spring (Upside‑Down Fix)</title>
+    <style>
+        :root { --bg: #1a1a2e; --panel: #16213e; --text: #ddd; --accent: #e94560; --border: #2a2a4a; }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family:system-ui,sans-serif; background:var(--bg); color:var(--text); display:flex; height:100vh; overflow:hidden; user-select:none; }
+        #canvas-container { flex:1; cursor:grab; background:#000; }
+        #sidebar { width:300px; background:var(--panel); border-left:1px solid var(--border); display:flex; flex-direction:column; font-size:0.8em; overflow-y:auto; }
+        h2 { padding:8px; font-size:0.9em; background:var(--accent); color:#fff; }
+        .section { padding:6px 8px; border-bottom:1px solid var(--border); }
+        button { background:var(--accent); color:#fff; border:none; padding:5px 8px; border-radius:3px; cursor:pointer; width:100%; margin:2px 0; font-size:0.75em; }
+        button.secondary { background:#0f3460; }
+        button.small { width:auto; padding:3px 6px; font-size:0.7em; }
+        .bone-list { max-height:150px; overflow-y:auto; background:#222; border-radius:3px; font-size:0.7em; }
+        .bone-item { padding:3px 6px; cursor:pointer; border-bottom:1px solid var(--border); }
+        .bone-item:hover { background:rgba(233,68,96,0.15); }
+        .bone-item.selected { background:rgba(233,68,96,0.3); border-left:3px solid var(--accent); }
+        .bone-item.jiggle { color:#4caf50; }
+        .bone-item.jiggle::after { content:' ⚡'; }
+        label { display:flex; justify-content:space-between; font-size:0.7em; margin:3px 0; }
+        input[type="range"] { width:100%; height:4px; }
+        .status { padding:6px 8px; font-size:0.7em; color:#888; margin-top:auto; }
+        .effect-toggle { display:flex; align-items:center; gap:6px; margin:4px 0; }
+        .effect-toggle input[type="checkbox"] { width:auto; }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+    <div id="sidebar">
+        <h2>🥊 Jiggle Lab (Safe Rot)</h2>
+        <div class="section">
+            <strong>📦 Model</strong>
+            <div style="border:2px dashed var(--border);border-radius:3px;padding:6px;text-align:center;cursor:pointer;font-size:0.7em;" id="drop-area">
+                Drop GLTF or click
+                <input type="file" id="file-input" accept=".gltf,.glb" style="display:none;">
+            </div>
+            <button class="secondary" id="btn-octopus">🐙 Octopus</button>
+            <button class="secondary" id="btn-robot">🤖 Robot</button>
+        </div>
+        <div class="section">
+            <strong>🦴 Bones</strong>
+            <div class="bone-list" id="bone-list">No model</div>
+            <button class="small secondary" id="btn-reset">Reset Pose</button>
+        </div>
+        <div class="section">
+            <strong>🛠 Gizmo</strong>
+            <button class="small" id="btn-move">Move (W)</button>
+            <button class="small" id="btn-rotate">Rotate (E)</button>
+            <label><input type="checkbox" id="world-space" checked> World space</label>
+        </div>
+        <div class="section">
+            <strong>⚡ Jiggle</strong>
+            <button id="btn-assign">+ Assign to selected</button>
+            <button class="secondary" id="btn-remove">- Remove</button>
+            <button class="secondary" id="btn-clear">Clear all</button>
+
+            <label>Pos Stiffness <span id="val-stiff">0.5</span></label>
+            <input type="range" id="stiffness" min="0.05" max="0.95" step="0.01" value="0.5">
+
+            <label>Pos Damping <span id="val-damp">0.3</span></label>
+            <input type="range" id="damping" min="0.05" max="0.8" step="0.01" value="0.3">
+
+            <label>Gravity <span id="val-grav">0.5</span></label>
+            <input type="range" id="gravity" min="0" max="1.5" step="0.01" value="0.5">
+
+            <label>Max Stretch <span id="val-stretch">0.5</span></label>
+            <input type="range" id="max-stretch" min="0.05" max="2.0" step="0.01" value="0.5">
+
+            <strong style="display:block;margin-top:6px;">🔄 Rotation</strong>
+            <label>Rot Stiffness <span id="val-rot-stiff">0.5</span></label>
+            <input type="range" id="rot-stiffness" min="0.05" max="0.95" step="0.01" value="0.5">
+
+            <label>Rot Damping <span id="val-rot-damp">0.3</span></label>
+            <input type="range" id="rot-damping" min="0.05" max="0.8" step="0.01" value="0.3">
+
+            <label>Max Angle <span id="val-max-angle">45°</span></label>
+            <input type="range" id="max-angle" min="1" max="120" step="1" value="45">
+        </div>
+
+        <div class="section">
+            <strong>✨ Effects (World)</strong>
+            <div class="effect-toggle">
+                <input type="checkbox" id="wind-enable"> Wind
+            </div>
+            <label>Amplitude <span id="val-wind-amp">0.0</span></label>
+            <input type="range" id="wind-amp" min="0" max="2.0" step="0.01" value="0.0">
+            <label>Frequency <span id="val-wind-freq">1.0</span></label>
+            <input type="range" id="wind-freq" min="0.1" max="5.0" step="0.1" value="1.0">
+
+            <div class="effect-toggle" style="margin-top:6px;">
+                <input type="checkbox" id="turb-enable"> Turbulence
+            </div>
+            <label>Amplitude <span id="val-turb-amp">0.0</span></label>
+            <input type="range" id="turb-amp" min="0" max="1.0" step="0.01" value="0.0">
+            <label>Scale <span id="val-turb-scale">1.0</span></label>
+            <input type="range" id="turb-scale" min="0.1" max="3.0" step="0.1" value="1.0">
+
+            <div class="effect-toggle" style="margin-top:6px;">
+                <input type="checkbox" id="sway-enable"> Sway (side‑to‑side)
+            </div>
+            <label>Amplitude <span id="val-sway-amp">0.0</span></label>
+            <input type="range" id="sway-amp" min="0" max="1.5" step="0.01" value="0.0">
+            <label>Frequency <span id="val-sway-freq">1.0</span></label>
+            <input type="range" id="sway-freq" min="0.1" max="3.0" step="0.1" value="1.0">
+        </div>
+
+        <div class="status" id="status">Ready – press G to jiggle</div>
+    </div>
+
+    <script type="importmap">
+        { "imports": {
+            "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.128.0/examples/jsm/"
+        } }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { TransformControls } from 'three/addons/controls/TransformControls.js';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+        // DOM
+        const container = document.getElementById('canvas-container');
+        const boneListEl = document.getElementById('bone-list');
+        const statusEl = document.getElementById('status');
+        const dropArea = document.getElementById('drop-area');
+        const fileInput = document.getElementById('file-input');
+
+        // Scene
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x1a1a2e);
+        const grid = new THREE.GridHelper(8, 20, 0x888888, 0x444444);
+        grid.position.y = -1.2;
+        scene.add(grid);
+
+        const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
+        camera.position.set(3, 2, 5);
+        camera.lookAt(0, 1, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'low-power' });
+        renderer.setPixelRatio(1);
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        container.appendChild(renderer.domElement);
+
+        scene.add(new THREE.AmbientLight(0x4466aa, 0.8));
+        const dir = new THREE.DirectionalLight(0xffffff, 0.9);
+        dir.position.set(5, 8, 5);
+        scene.add(dir);
+
+        // Controls
+        const orbit = new OrbitControls(camera, renderer.domElement);
+        orbit.target.set(0, 1, 0);
+        orbit.enableDamping = true;
+        orbit.dampingFactor = 0.08;
+        orbit.zoomSpeed = 0.5;
+        orbit.minDistance = 0.5;
+        orbit.maxDistance = 50;
+        orbit.update();
+
+        const transform = new TransformControls(camera, renderer.domElement);
+        let dragStartPos = new THREE.Vector3();
+        let dragStartQuat = new THREE.Quaternion();
+        transform.addEventListener('dragging-changed', (e) => {
+            orbit.enabled = !e.value;
+            if (selectedBone && jiggleMap.has(selectedBone.name)) {
+                const data = jiggleMap.get(selectedBone.name);
+                if (e.value) {
+                    dragStartPos.copy(selectedBone.position);
+                    dragStartQuat.copy(selectedBone.quaternion);
+                    data.paused = true;
+                } else {
+                    data.paused = false;
+                    if (!selectedBone.position.equals(dragStartPos) || !selectedBone.quaternion.equals(dragStartQuat)) {
+                        updateJiggleRest(selectedBone.name);
+                    }
+                }
+            }
+        });
+        transform.addEventListener('objectChange', () => {
+            if (skeleton) skeleton.update();
+        });
+        scene.add(transform);
+
+        // State
+        let model = null;
+        let skeleton = null;
+        let boneMap = new Map();
+        let selectedBone = null;
+        const jiggleMap = new Map();
+        let params = {
+            stiffness: 0.5, damping: 0.3, gravity: 0.5, maxStretch: 0.5,
+            rotStiffness: 0.5, rotDamping: 0.3, maxAngle: 45 * Math.PI / 180,
+            windEnable: false, windAmp: 0, windFreq: 1,
+            turbEnable: false, turbAmp: 0, turbScale: 1,
+            swayEnable: false, swayAmp: 0, swayFreq: 1
+        };
+        let effectTime = 0;
+
+        // Phong materials
+        function toPhong(obj) {
+            obj.traverse(child => {
+                if (child.isMesh && child.material) {
+                    let color = 0xcccccc;
+                    if (child.material.color) color = child.material.color.getHex();
+                    const phong = new THREE.MeshPhongMaterial({
+                        color, map: child.material.map || null,
+                        transparent: child.material.transparent || false,
+                        side: child.material.side || THREE.FrontSide,
+                        shininess: 0, specular: 0x000000, skinning: true
+                    });
+                    child.material.dispose();
+                    child.material = phong;
+                }
+            });
+        }
+
+        // Bone list
+        function rebuildList() {
+            boneListEl.innerHTML = '';
+            if (!skeleton) { boneListEl.innerHTML = '<div class="bone-item">No skeleton</div>'; return; }
+            const all = [...skeleton.bones];
+            if (model) model.traverse(c => { if (c.isBone && !all.includes(c)) all.push(c); });
+            all.sort((a,b) => a.name.localeCompare(b.name));
+            all.forEach(b => {
+                const div = document.createElement('div');
+                div.className = 'bone-item';
+                if (jiggleMap.has(b.name)) div.classList.add('jiggle');
+                if (b === selectedBone) div.classList.add('selected');
+                div.textContent = '🦴 ' + b.name;
+                div.onclick = () => selectBone(b);
+                boneListEl.appendChild(div);
+            });
+        }
+
+        function selectBone(b) {
+            if (selectedBone === b) { selectedBone = null; transform.detach(); rebuildList(); return; }
+            selectedBone = b;
+            transform.attach(b);
+            rebuildList();
+        }
+
+        // Model loading
+        const loader = new GLTFLoader();
+        function loadModel(url) {
+            statusEl.textContent = 'Loading...';
+            loader.load(url, gltf => {
+                if (model) scene.remove(model);
+                model = gltf.scene;
+                toPhong(model);
+                scene.add(model);
+
+                skeleton = null; boneMap.clear(); jiggleMap.clear();
+                selectedBone = null; transform.detach();
+
+                model.traverse(c => { if (c.isSkinnedMesh && c.skeleton) skeleton = c.skeleton; });
+                if (!skeleton) {
+                    const bones = [];
+                    model.traverse(c => { if (c.isBone) bones.push(c); });
+                    if (bones.length) skeleton = new THREE.Skeleton(bones);
+                }
+                if (skeleton) {
+                    skeleton.bones.forEach(b => boneMap.set(b.name, b));
+                    skeleton.calculateInverses();
+                    skeleton.bones.forEach(b => b.updateMatrixWorld());
+                    skeleton.update();
+                }
+
+                const box = new THREE.Box3().setFromObject(model);
+                const s = box.getSize(new THREE.Vector3());
+                const c = box.getCenter(new THREE.Vector3());
+                const m = Math.max(s.x, s.y, s.z);
+                if (m > 0 && m < 1000) {
+                    const sc = 2.5 / m;
+                    model.scale.setScalar(sc);
+                    model.position.set(-c.x * sc, -box.min.y * sc, -c.z * sc);
+                }
+                orbit.target.set(0, 1, 0);
+                orbit.update();
+                rebuildList();
+                statusEl.textContent = 'Loaded – select bone, press G';
+            }, null, err => { statusEl.textContent = 'Load error'; console.error(err); });
+        }
+
+        document.getElementById('btn-octopus').onclick = () => loadModel('https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/OctopusGLB/Octopus.glb');
+        document.getElementById('btn-robot').onclick = () => loadModel('https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/RobotExpressive/RobotExpressive.glb');
+        dropArea.onclick = () => fileInput.click();
+        fileInput.onchange = e => { if (e.target.files[0]) loadModel(URL.createObjectURL(e.target.files[0])); };
+        dropArea.ondragover = e => e.preventDefault();
+        dropArea.ondrop = e => { e.preventDefault(); if (e.dataTransfer.files[0]) loadModel(URL.createObjectURL(e.dataTransfer.files[0])); };
+
+        // Reset
+        document.getElementById('btn-reset').onclick = () => {
+            if (!skeleton) return;
+            skeleton.bones.forEach(b => { b.position.set(0,0,0); b.quaternion.identity(); b.scale.set(1,1,1); });
+            skeleton.bones.forEach(b => b.updateMatrixWorld());
+            skeleton.update();
+            selectedBone = null; transform.detach(); rebuildList();
+        };
+
+        // Gizmo
+        document.getElementById('btn-move').onclick = () => transform.setMode('translate');
+        document.getElementById('btn-rotate').onclick = () => transform.setMode('rotate');
+        document.getElementById('world-space').onchange = e => transform.setSpace(e.target.checked ? 'world' : 'local');
+
+        // Jiggle helpers
+        function computeWorldPosTarget(bone, localPos) {
+            const parent = bone.parent && bone.parent.isBone ? bone.parent : null;
+            const target = new THREE.Vector3().copy(localPos);
+            if (parent) {
+                parent.updateMatrixWorld();
+                target.applyMatrix4(parent.matrixWorld);
+            }
+            return target;
+        }
+        function computeWorldQuatTarget(bone, localQuat) {
+            const parent = bone.parent && bone.parent.isBone ? bone.parent : null;
+            if (parent) {
+                const pq = new THREE.Quaternion();
+                parent.getWorldQuaternion(pq);
+                return pq.clone().multiply(localQuat);
+            }
+            return localQuat.clone();
+        }
+
+        function assignJiggle(name) {
+            if (!boneMap.has(name)) return;
+            const bone = boneMap.get(name);
+            const localPos = bone.position.clone();
+            const localQuat = bone.quaternion.clone();
+            const worldTargetPos = computeWorldPosTarget(bone, localPos);
+            const worldTargetQuat = computeWorldQuatTarget(bone, localQuat);
+            jiggleMap.set(name, {
+                originalLocal: localPos.clone(),
+                originalLocalQuat: localQuat.clone(),
+                prevWorldPos: worldTargetPos.clone(),
+                stiffness: params.stiffness,
+                damping: params.damping,
+                gravity: params.gravity,
+                maxStretch: params.maxStretch,
+                rotStiffness: params.rotStiffness,
+                rotDamping: params.rotDamping,
+                maxAngle: params.maxAngle,
+                paused: false,
+                // Rotation spring state (axis‑angle)
+                rotVelocity: new THREE.Vector3(),
+                prevWorldQuat: worldTargetQuat.clone()
+            });
+            rebuildList();
+        }
+        function removeJiggle(name) { jiggleMap.delete(name); rebuildList(); }
+        function updateJiggleRest(name) {
+            const data = jiggleMap.get(name);
+            if (!data) return;
+            const bone = boneMap.get(name);
+            if (!bone) return;
+            data.originalLocal.copy(bone.position);
+            data.originalLocalQuat.copy(bone.quaternion);
+            const worldPosTarget = computeWorldPosTarget(bone, data.originalLocal);
+            data.prevWorldPos.copy(worldPosTarget);
+            const worldQuatTarget = computeWorldQuatTarget(bone, data.originalLocalQuat);
+            data.prevWorldQuat.copy(worldQuatTarget);
+            data.rotVelocity.set(0,0,0);
+        }
+
+        document.getElementById('btn-assign').onclick = () => { if (selectedBone) assignJiggle(selectedBone.name); };
+        document.getElementById('btn-remove').onclick = () => { if (selectedBone && jiggleMap.has(selectedBone.name)) removeJiggle(selectedBone.name); };
+        document.getElementById('btn-clear').onclick = () => { jiggleMap.clear(); rebuildList(); };
+
+        // Sliders
+        document.getElementById('stiffness').oninput = e => { params.stiffness = +e.target.value; document.getElementById('val-stiff').textContent = params.stiffness.toFixed(2); jiggleMap.forEach(d => d.stiffness = params.stiffness); };
+        document.getElementById('damping').oninput = e => { params.damping = +e.target.value; document.getElementById('val-damp').textContent = params.damping.toFixed(2); jiggleMap.forEach(d => d.damping = params.damping); };
+        document.getElementById('gravity').oninput = e => { params.gravity = +e.target.value; document.getElementById('val-grav').textContent = params.gravity.toFixed(2); jiggleMap.forEach(d => d.gravity = params.gravity); };
+        document.getElementById('max-stretch').oninput = e => { params.maxStretch = +e.target.value; document.getElementById('val-stretch').textContent = params.maxStretch.toFixed(2); jiggleMap.forEach(d => d.maxStretch = params.maxStretch); };
+        document.getElementById('rot-stiffness').oninput = e => { params.rotStiffness = +e.target.value; document.getElementById('val-rot-stiff').textContent = params.rotStiffness.toFixed(2); jiggleMap.forEach(d => d.rotStiffness = params.rotStiffness); };
+        document.getElementById('rot-damping').oninput = e => { params.rotDamping = +e.target.value; document.getElementById('val-rot-damp').textContent = params.rotDamping.toFixed(2); jiggleMap.forEach(d => d.rotDamping = params.rotDamping); };
+        document.getElementById('max-angle').oninput = e => { const deg = +e.target.value; params.maxAngle = deg * Math.PI / 180; document.getElementById('val-max-angle').textContent = deg + '°'; jiggleMap.forEach(d => d.maxAngle = params.maxAngle); };
+        document.getElementById('wind-enable').onchange = e => params.windEnable = e.target.checked;
+        document.getElementById('wind-amp').oninput = e => { params.windAmp = +e.target.value; document.getElementById('val-wind-amp').textContent = params.windAmp.toFixed(2); };
+        document.getElementById('wind-freq').oninput = e => { params.windFreq = +e.target.value; document.getElementById('val-wind-freq').textContent = params.windFreq.toFixed(2); };
+        document.getElementById('turb-enable').onchange = e => params.turbEnable = e.target.checked;
+        document.getElementById('turb-amp').oninput = e => { params.turbAmp = +e.target.value; document.getElementById('val-turb-amp').textContent = params.turbAmp.toFixed(2); };
+        document.getElementById('turb-scale').oninput = e => { params.turbScale = +e.target.value; document.getElementById('val-turb-scale').textContent = params.turbScale.toFixed(2); };
+        document.getElementById('sway-enable').onchange = e => params.swayEnable = e.target.checked;
+        document.getElementById('sway-amp').oninput = e => { params.swayAmp = +e.target.value; document.getElementById('val-sway-amp').textContent = params.swayAmp.toFixed(2); };
+        document.getElementById('sway-freq').oninput = e => { params.swayFreq = +e.target.value; document.getElementById('val-sway-freq').textContent = params.swayFreq.toFixed(2); };
+
+        // Physics tick
+        function physicsTick(dt) {
+            if (jiggleMap.size === 0) return;
+            const gravVec = new THREE.Vector3(0, -1, 0);
+            effectTime += dt;
+
+            jiggleMap.forEach((data, name) => {
+                if (data.paused) return;
+                const bone = boneMap.get(name);
+                if (!bone) return;
+
+                // ---- Position Verlet (unchanged) ----
+                const worldPos = new THREE.Vector3();
+                bone.getWorldPosition(worldPos);
+                const targetWorld = computeWorldPosTarget(bone, data.originalLocal);
+                if (isNaN(targetWorld.x)) return;
+
+                const vel = worldPos.clone().sub(data.prevWorldPos).multiplyScalar(1 - data.damping);
+                const toTarget = targetWorld.clone().sub(worldPos);
+                if (toTarget.length() > 2) toTarget.normalize().multiplyScalar(2);
+                const spring = toTarget.multiplyScalar(data.stiffness * 20 * dt);
+                const gravity = gravVec.clone().multiplyScalar(data.gravity * dt * 5);
+
+                // Effects (world)
+                const externalForce = new THREE.Vector3();
+                if (params.windEnable && params.windAmp > 0) {
+                    externalForce.x += Math.sin(effectTime * params.windFreq * 2 * Math.PI) * params.windAmp;
+                }
+                if (params.turbEnable && params.turbAmp > 0) {
+                    const hash = name.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+                    externalForce.x += Math.sin(effectTime * 7.3 + hash*0.1) * Math.cos(effectTime * 11.2 + hash*0.07) * params.turbAmp * params.turbScale;
+                    externalForce.y += Math.cos(effectTime * 9.7 + hash*0.13) * Math.sin(effectTime * 13.4 + hash*0.09) * params.turbAmp * params.turbScale * 0.5;
+                    externalForce.z += Math.sin(effectTime * 10.1 + hash*0.11) * Math.cos(effectTime * 8.5 + hash*0.12) * params.turbAmp * params.turbScale;
+                }
+                if (params.swayEnable && params.swayAmp > 0) {
+                    externalForce.x += Math.sin(effectTime * params.swayFreq * 2 * Math.PI) * params.swayAmp;
+                }
+
+                const totalGravity = gravity.add(externalForce);
+                let newWorld = worldPos.clone().add(vel).add(spring.multiplyScalar(dt)).add(totalGravity);
+
+                const stepDelta = newWorld.clone().sub(worldPos);
+                if (stepDelta.length() > 0.5) stepDelta.normalize().multiplyScalar(0.5);
+                newWorld = worldPos.clone().add(stepDelta);
+
+                const stretchVec = newWorld.clone().sub(targetWorld);
+                if (stretchVec.length() > data.maxStretch) {
+                    stretchVec.normalize().multiplyScalar(data.maxStretch);
+                    newWorld = targetWorld.clone().add(stretchVec);
+                }
+
+                if (isNaN(newWorld.x)) return;
+                data.prevWorldPos.copy(worldPos);
+
+                const parent = bone.parent && bone.parent.isBone ? bone.parent : null;
+                if (parent) {
+                    const invParent = new THREE.Matrix4();
+                    parent.updateMatrixWorld();
+                    invParent.copy(parent.matrixWorld).invert();
+                    const localPos = newWorld.clone().applyMatrix4(invParent);
+                    if (!isNaN(localPos.x)) bone.position.copy(localPos);
+                } else {
+                    bone.position.copy(newWorld);
+                }
+
+                // ---- Rotation: Safe axis‑angle spring ----
+                const worldQuat = new THREE.Quaternion();
+                bone.getWorldQuaternion(worldQuat);
+                const targetQuat = computeWorldQuatTarget(bone, data.originalLocalQuat);
+
+                // Damping on the quaternion derivative (angular velocity)
+                let rotVel = data.rotVelocity;
+                // Spring torque: compute delta quaternion, extract axis‑angle
+                const deltaQ = targetQuat.clone().multiply(worldQuat.clone().invert());
+                // Ensure deltaQ is not NaN and within [-1,1] for acos
+                let deltaAngle = 0;
+                let deltaAxis = new THREE.Vector3(0,1,0);
+                if (deltaQ.w <= -1 || deltaQ.w >= 1) {
+                    // No rotation
+                } else {
+                    deltaAngle = 2 * Math.acos(deltaQ.w);
+                    if (deltaAngle > 0.001) {
+                        const s = Math.sqrt(1 - deltaQ.w * deltaQ.w);
+                        deltaAxis.set(deltaQ.x / s, deltaQ.y / s, deltaQ.z / s);
+                    }
+                }
+                // Clamp deltaAngle to maxAngle
+                if (deltaAngle > data.maxAngle) deltaAngle = data.maxAngle;
+
+                // Torque = stiffness * deltaAngle * axis
+                const torque = deltaAxis.multiplyScalar(data.rotStiffness * deltaAngle * 10 * dt);
+                // Damping applied to velocity
+                rotVel.multiplyScalar(1 - data.rotDamping);
+                rotVel.add(torque);
+
+                // Integrate velocity into rotation
+                const rotAmount = rotVel.length() * dt;
+                if (rotAmount > 0.001) {
+                    const rotAxis = rotVel.clone().normalize();
+                    const rotQuat = new THREE.Quaternion().setFromAxisAngle(rotAxis, rotAmount);
+                    worldQuat.premultiply(rotQuat);
+                    worldQuat.normalize();
+                }
+                data.rotVelocity = rotVel;
+                data.prevWorldQuat.copy(worldQuat);
+
+                // Convert to local
+                if (parent) {
+                    const pq = new THREE.Quaternion();
+                    parent.getWorldQuaternion(pq);
+                    const localQuat = pq.clone().invert().multiply(worldQuat);
+                    if (!isNaN(localQuat.x)) bone.quaternion.copy(localQuat);
+                } else {
+                    bone.quaternion.copy(worldQuat);
+                }
+
+                bone.updateMatrixWorld();
+            });
+
+            if (skeleton) skeleton.update();
+        }
+
+        // Render loop
+        const clock = new THREE.Clock();
+        let accum = 0;
+        const step = 1 / 30;
+        function animate() {
+            requestAnimationFrame(animate);
+            const dt = Math.min(clock.getDelta(), 0.1);
+            accum += dt;
+            while (accum >= step) { physicsTick(step); accum -= step; }
+            orbit.update();
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+
+        window.addEventListener('keydown', e => {
+            if (e.key === 'g' && selectedBone) {
+                if (jiggleMap.has(selectedBone.name)) removeJiggle(selectedBone.name);
+                else assignJiggle(selectedBone.name);
+            }
+            if (e.key === 'Escape') { selectedBone = null; transform.detach(); rebuildList(); }
+            if (e.key === 'w') transform.setMode('translate');
+            if (e.key === 'e') transform.setMode('rotate');
+        });
+
+        setTimeout(() => loadModel('https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/OctopusGLB/Octopus.glb'), 300);
+        animate();
+    </script>
+</body>
+</html>
